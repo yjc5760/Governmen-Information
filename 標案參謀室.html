@@ -301,9 +301,10 @@ tailwind.config = { theme: { extend: { colors: {
       <div class="card p-5 mb-4">
         <div class="eyebrow">AGENCY INSIGHT</div>
         <h3 class="font-bold text-ink-900 mt-1">選一個機關，看它歷年發包給誰</h3>
-        <p class="text-xs text-slate-500 mt-1">選定後會直接向 API 抓該機關的<strong>全期間</strong>公告，不受同步天數限制。下方清單來自快取；想看沒同步到的機關，在標案詳情按「機關採購輪廓」也能進來。</p>
+        <p class="text-xs text-slate-500 mt-1">選定後會直接向 API 抓該機關的<strong>全期間</strong>公告，不受同步天數限制。</p>
+        <p class="text-xs text-slate-400 mt-1">下方是<strong>已認識的機關</strong>——標案 API 沒有「用機關名稱查機關」的端點，機關只能從抓下來的公告裡累積。同步過的公告、查詢結果、開過的標案都會自動加進來，且不會隨公告快取被裁掉。</p>
         <div class="flex gap-2 mt-3">
-          <input id="agencyFilter" type="text" placeholder="篩選機關名稱，例如：台灣電力" class="flex-1 px-3 py-2 border rounded-xl text-sm">
+          <input id="agencyFilter" type="text" placeholder="篩選已認識的機關，例如：台灣電力" class="flex-1 px-3 py-2 border rounded-xl text-sm">
           <button onclick="renderAgencies()" class="px-4 py-2 bg-jade-600 text-white rounded-xl text-sm font-medium">篩選</button>
         </div>
       </div>
@@ -384,7 +385,8 @@ const LS = {
 };
 const K = { BASE:'pi_api_base', TOKEN:'pi_api_token',
   DAYCACHE:'pi_daycache', TRACKED:'pi_tracked', COMPARE:'pi_compare',
-  PROXY:'pi_proxy_base', WATCH:'pi_watch_keywords', AMOUNT:'pi_amount_cache' };
+  PROXY:'pi_proxy_base', WATCH:'pi_watch_keywords', AMOUNT:'pi_amount_cache',
+  AGENCY:'pi_agency_index' };
 
 /* pcc-viewer 公開設定檔裡的那組 token 已被 API 端擋掉（回 403）。
    openfun 這支 API 目前不帶 token 也能公開查詢，所以預設不送 Authorization。
@@ -401,6 +403,7 @@ let tracked       = LS.get(K.TRACKED, []);        // [{unit_id,job_number,unit_n
 let compareList   = LS.get(K.COMPARE, []);
 let watchKeywords = LS.get(K.WATCH, []);
 let amountCache   = LS.get(K.AMOUNT, {});   // 'unit_id|job_number' -> {a:決標金額, d:決標日期, b:預算}
+let agencyIndex   = LS.get(K.AGENCY, {});   // 機關名 -> unit_id；累積式，不隨公告快取一起被裁掉
 let proxyOk       = false;
 let currentTender = null;
 let calCursor     = new Date();
@@ -648,13 +651,14 @@ async function syncDays(){
       const r=await api('/api/listbydate?date='+key);
       const recs=(r.records||[]).map(x=>({u:x.unit_id,n:x.unit_name,j:x.job_number,t:(x.brief&&x.brief.title)||'',ty:(x.brief&&x.brief.type)||'',f:x.filename||'',
         c:(x.brief&&x.brief.companies&&x.brief.companies.names)||[]}));
+      recs.forEach(z=>noteAgency(z.u,z.n));
       dayCache[key]=recs; got+=recs.length;
     }catch(e){ fail++; }
     await new Promise(r=>setTimeout(r,350));
   }
   // 只留最近 21 天
   Object.keys(dayCache).sort().slice(0,-21).forEach(k=>delete dayCache[k]);
-  persistDayCache();
+  persistDayCache(); persistAgencyIndex();
   bar.classList.add('hidden'); btn.disabled=false; btn.classList.remove('opacity-50');
   toast('同步完成：'+fmtNum(got)+' 筆'+(fail?('，'+fail+' 天失敗'):''), fail?'warning':'success');
   renderOverview();
@@ -709,6 +713,7 @@ async function doSearch(page){
   try{
     const r=await api('/api/'+ep+'?query='+encodeURIComponent(q)+'&page='+page);
     let recs=r.records||[];
+    recs.forEach(x=>noteAgency(x.unit_id,x.unit_name)); persistAgencyIndex();
     if(document.getElementById('filterTenderOnly').checked) recs=recs.filter(x=>(x.brief&&x.brief.type||'').indexOf('招標')>=0);
     if(document.getElementById('filterAwardOnly').checked)  recs=recs.filter(x=>(x.brief&&x.brief.type||'').indexOf('決標')>=0);
     meta.textContent='共 '+fmtNum(r.total_records)+' 筆，第 '+r.page+' / '+r.total_pages+' 頁'+(recs.length!==(r.records||[]).length?('（本頁篩選後 '+recs.length+' 筆）'):'');
@@ -771,6 +776,7 @@ async function openTender(unit_id,job_number,unit_name,title){
       deadline:pick(detail,['截止投標','投標截止']), budget:pick(detail,['預算金額']), detail, records };
     document.getElementById('tmUnit').textContent=currentTender.unit_name;
     document.getElementById('tmTitle').textContent=currentTender.title;
+    if(noteAgency(unit_id,currentTender.unit_name)) persistAgencyIndex();
     const url=pick(detail,['url']);
     if(url){ const a=document.getElementById('tmSourceLink'); a.href=url; a.classList.remove('hidden'); }
     renderTenderBody();
@@ -858,21 +864,85 @@ function addCompareCurrent(){
   LS.set(K.COMPARE,compareList); updateCounters(); toast('已加入比較（'+compareList.length+'/4）','success');
 }
 /* ================= 機關洞察 ================= */
+/* 機關索引：API 沒有「用機關名稱查機關」的端點，只能從抓下來的公告裡累積
+   unit_name -> unit_id。它獨立於公告快取，所以快取被裁掉後機關仍然認得。 */
+const AGENCY_INDEX_MAX = 3000;
+function noteAgency(unit_id, unit_name){
+  const nm = String(unit_name||'').trim(), id = String(unit_id||'').trim();
+  if(!nm || !id || agencyIndex[nm]===id) return false;
+  agencyIndex[nm]=id; return true;
+}
+function persistAgencyIndex(){
+  const names=Object.keys(agencyIndex);
+  if(names.length>AGENCY_INDEX_MAX) names.slice(0,names.length-AGENCY_INDEX_MAX).forEach(nm=>delete agencyIndex[nm]);
+  LS.set(K.AGENCY,agencyIndex);
+}
+function clearAgencyFilter(){ document.getElementById('agencyFilter').value=''; renderAgencies(); }
+function syncFromAgencies(){ go('overview'); document.getElementById('syncDays').value='7'; syncDays(); }
+function searchAgencyByTitle(){
+  const q=(document.getElementById('agencyFilter').value||'').trim();
+  if(!q) return;
+  go('tenders');
+  document.getElementById('searchMode').value='title';
+  document.getElementById('searchQuery').value=q;
+  doSearch(1);
+}
+
 function renderAgencies(){
   const filter=(document.getElementById('agencyFilter').value||'').trim();
-  const recs=cacheRecords();
   const box=document.getElementById('agencyList');
-  if(!recs.length){ box.innerHTML='<div class="card p-8 text-center text-sm text-slate-400">快取裡還沒有資料。到總覽按「開始同步」，或直接在標案情報中心開一筆標案，按「機關採購輪廓」進來。</div>'; return; }
+  const recs=cacheRecords();
+
+  // 先用快取算出各機關的公告則數
   const map={};
-  recs.forEach(r=>{ if(filter&&r.n.indexOf(filter)<0) return;
+  recs.forEach(r=>{
+    if(!r.n) return;
     if(!map[r.n]) map[r.n]={name:r.n,unit_id:r.u,total:0,tender:0,award:0};
     const m=map[r.n]; m.total++;
     if((r.ty||'').indexOf('招標')>=0) m.tender++;
-    if((r.ty||'').indexOf('決標')>=0) m.award++; });
-  const list=Object.values(map).sort((a,b)=>b.total-a.total).slice(0,60);
-  if(!list.length){ box.innerHTML='<div class="card p-8 text-center text-sm text-slate-400">沒有符合的機關。</div>'; return; }
-  const max=list[0].total;
+    if((r.ty||'').indexOf('決標')>=0) m.award++;
+  });
+  // 再補上索引裡有、但目前快取期間內沒有公告的機關（照樣可以點進去看全期間）
+  Object.keys(agencyIndex).forEach(nm=>{
+    if(!map[nm]) map[nm]={name:nm,unit_id:agencyIndex[nm],total:0,tender:0,award:0};
+  });
+
+  const known=Object.values(map);
+  if(!known.length){
+    box.innerHTML='<div class="card p-8 text-center space-y-3">'+
+      '<p class="text-sm text-slate-500">還沒有認識任何機關。</p>'+
+      '<p class="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">標案 API 沒有「用機關名稱查機關」的端點，機關只能從抓下來的公告裡認識。先同步幾天公告，或到標案情報中心查一筆標案、按「機關採購輪廓」進來。</p>'+
+      '<div class="flex gap-2 justify-center flex-wrap pt-1">'+
+      '<button onclick="syncFromAgencies()" class="px-4 py-2 bg-ink-800 hover:bg-ink-900 text-white rounded-lg text-xs font-medium">同步近 7 日公告</button>'+
+      '<button onclick="go(\'tenders\')" class="px-4 py-2 border rounded-lg text-xs hover:bg-slate-50">去標案情報中心</button>'+
+      '</div></div>';
+    return;
+  }
+
+  const hit = filter ? known.filter(m=>m.name.indexOf(filter)>=0) : known;
+  if(!hit.length){
+    box.innerHTML='<div class="card p-8 text-center space-y-3">'+
+      '<p class="text-sm text-slate-500">已認識的 <strong>'+known.length+'</strong> 個機關裡沒有「'+esc(filter)+'」。</p>'+
+      '<p class="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">API 只能用<strong>標案名稱</strong>查，不能用機關名稱查。改用「'+esc(filter)+'」查標案，開任一筆按「機關採購輪廓」，這個機關就會被加進來。</p>'+
+      '<div class="flex gap-2 justify-center flex-wrap pt-1">'+
+      '<button onclick="searchAgencyByTitle()" class="px-4 py-2 bg-jade-600 hover:bg-jade-700 text-white rounded-lg text-xs font-medium">用「'+esc(filter)+'」查標案</button>'+
+      '<button onclick="clearAgencyFilter()" class="px-4 py-2 border rounded-lg text-xs hover:bg-slate-50">清除篩選</button>'+
+      '</div></div>';
+    return;
+  }
+
+  // 快取內有公告的排前面（多的先），其餘按名稱排
+  hit.sort((a,b)=> (b.total-a.total) || a.name.localeCompare(b.name,'zh-Hant'));
+  const list=hit.slice(0,60);
+  const max=list[0].total||1;
+
   box.innerHTML='';
+  const meta=document.createElement('div');
+  meta.className='text-[11px] text-slate-500 px-1 pb-1';
+  meta.textContent='共 '+hit.length+' 個機關'+(filter?('符合「'+filter+'」'):'')+
+    (hit.length>60?'，顯示前 60 個':'')+'；則數來自本地快取的 '+Object.keys(dayCache).length+' 天公告。';
+  box.appendChild(meta);
+
   list.forEach((m,i)=>{
     const el=document.createElement('div');
     el.className='card p-4 cursor-pointer hover:shadow-md transition';
@@ -880,9 +950,11 @@ function renderAgencies(){
     el.innerHTML='<div class="flex items-center gap-3">'+
       '<div class="w-7 h-7 rounded-lg bg-jade-50 text-jade-700 text-xs font-bold flex items-center justify-center flex-shrink-0">'+(i+1)+'</div>'+
       '<div class="flex-1 min-w-0"><div class="text-sm font-semibold text-ink-900 truncate">'+esc(m.name)+'</div>'+
-      '<div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden"><div class="h-full bg-jade-500 rounded-full" style="width:'+(m.total/max*100)+'%"></div></div>'+
-      '<div class="text-[11px] text-slate-500 mt-1.5">快取內 '+m.total+' 則 · 招標 '+m.tender+' · 決標 '+m.award+'</div></div>'+
-      '<i class="fa-solid fa-chevron-right text-slate-300"></i></div>';
+      (m.total
+        ? '<div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden"><div class="h-full bg-jade-500 rounded-full" style="width:'+(m.total/max*100)+'%"></div></div>'+
+          '<div class="text-[11px] text-slate-500 mt-1.5">快取內 '+m.total+' 則 · 招標 '+m.tender+' · 決標 '+m.award+'</div>'
+        : '<div class="text-[11px] text-slate-400 mt-1.5">已認識，但快取的這幾天沒有它的公告 · 點進去仍可看全期間</div>')+
+      '</div><i class="fa-solid fa-chevron-right text-slate-300"></i></div>';
     box.appendChild(el);
   });
 }
@@ -924,6 +996,7 @@ async function openAgency(unit_id,unit_name){
       page++; await new Promise(s=>setTimeout(s,300));
     }
     unitData={unit_id,unit_name:name,records:all};
+    if(noteAgency(unit_id,name)) persistAgencyIndex();
     unitVendorQ=''; unitSort='count';
     renderAgencyDetail();
   }catch(e){ box.innerHTML='<div class="card p-6 text-sm text-rose-600">載入失敗：'+esc(e.message)+'</div>'; }
@@ -1175,6 +1248,7 @@ async function doCompanySearch(){
   try{
     const r=await api('/api/'+(isId?'searchbycompanyid':'searchbycompanyname')+'?query='+encodeURIComponent(q)+'&page=1');
     const recs=r.records||[];
+    recs.forEach(x=>noteAgency(x.unit_id,x.unit_name)); persistAgencyIndex();
     box.innerHTML='<div class="text-xs text-slate-500 mb-2">共 '+fmtNum(r.total_records)+' 筆，顯示第 1 頁</div>';
     recs.forEach(x=>box.appendChild(tenderCard(x)));
     if(!recs.length) box.innerHTML='<div class="card p-8 text-center text-sm text-slate-400">查無資料。</div>';
@@ -1295,8 +1369,8 @@ function dl(blob,name){ const u=URL.createObjectURL(blob); const a=document.crea
   document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(u),1000); }
 /* ================= 備份 ================= */
 function exportBackup(){
-  const data={version:3,exportedAt:new Date().toISOString(),
-    tracked,compare:compareList,watch:watchKeywords};
+  const data={version:4,exportedAt:new Date().toISOString(),
+    tracked,compare:compareList,watch:watchKeywords,agencies:agencyIndex};
   dl(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),'標案參謀室備份_'+new Date().toISOString().slice(0,10)+'.json');
   toast('備份已下載','success');
 }
@@ -1307,13 +1381,14 @@ document.getElementById('backupInput').addEventListener('change',async e=>{
     if(Array.isArray(d.tracked)){ tracked=d.tracked; LS.set(K.TRACKED,tracked); }
     if(Array.isArray(d.compare)){ compareList=d.compare; LS.set(K.COMPARE,compareList); }
     if(Array.isArray(d.watch)){ watchKeywords=d.watch; LS.set(K.WATCH,watchKeywords); renderWatchChips(); }
+    if(d.agencies&&typeof d.agencies==='object'){ Object.assign(agencyIndex,d.agencies); persistAgencyIndex(); }
     updateCounters();
     toast('備份已匯入','success');
   }catch(err){ toast('匯入失敗：格式不對','error'); }
   e.target.value='';
 });
 function wipeAll(){
-  if(!confirm('會清掉追蹤、比較、關鍵字、決標金額快取與公告快取，確定？')) return;
+  if(!confirm('會清掉追蹤、比較、關鍵字、機關索引、決標金額快取與公告快取，確定？')) return;
   Object.values(K).forEach(k=>LS.del(k)); location.reload();
 }
 
@@ -1323,6 +1398,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('companyQuery').addEventListener('keydown',e=>{ if(e.key==='Enter') doCompanySearch(); });
   document.getElementById('liveKeyword').addEventListener('keydown',e=>{ if(e.key==='Enter') doLiveSearch(); });
   document.getElementById('watchInput').addEventListener('keydown',e=>{ if(e.key==='Enter') addWatchKeyword(); });
+  document.getElementById('agencyFilter').addEventListener('keydown',e=>{ if(e.key==='Enter') renderAgencies(); });
   renderWatchChips(); checkProxy(false);
   updateCounters(); renderOverview();
 });
