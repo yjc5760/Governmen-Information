@@ -1,11 +1,13 @@
 /**
  * 標案參謀室 — 官網即時查 proxy
  *
- * 直接查詢政府電子採購網的「標案查詢」頁面，解析成 JSON 給本機網頁使用。
+ * 直接查詢政府電子採購網的「標案查詢」頁面，解析成 JSON 給本機網頁使用，
+ * 同時把同資料夾的 標案參謀室.html 當靜態檔服務出去。
  * 解析邏輯參考 h30190/SearchProcurementTenders-crawler.Ver (MIT)。
  *
- * 啟動： node server.js
+ * 啟動： node server.js        （或 npm start）
  * 預設： http://localhost:5178
+ * 換埠： PORT=8080 node server.js
  */
 
 import http from 'node:http';
@@ -16,10 +18,25 @@ import * as cheerio from 'cheerio';
 import iconv from 'iconv-lite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT || 5178;
+const ROOT = path.resolve(__dirname);
+
+const PORT = Number(process.env.PORT) || 5178;
+const HOST = process.env.HOST || '127.0.0.1';   // 只綁本機，不對外網開放
 const BASE = 'https://web.pcc.gov.tw/prkms/tender/common/basic/readTenderBasic';
-const CACHE_TTL = 10 * 60 * 1000;   // 同一關鍵字 10 分鐘內走快取
-const MIN_GAP   = 1200;             // 兩次對官網的請求至少間隔（毫秒）
+
+const CACHE_TTL     = 10 * 60 * 1000;   // 同一組查詢條件 10 分鐘內走快取
+const CACHE_MAX     = 200;              // 快取上限，避免長時間執行後記憶體無上限成長
+const MIN_GAP       = 1200;             // 兩次對官網的請求至少間隔（毫秒）
+const FETCH_TIMEOUT = 20000;
+const PAGE_SIZE_MAX = 100;
+
+const INDEX_FILE = '標案參謀室.html';
+
+const VERSION = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version || '0.0.0';
+  } catch { return '0.0.0'; }
+})();
 
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
@@ -28,8 +45,8 @@ const HEADERS = {
   'Cache-Control': 'no-cache'
 };
 
-const cache = new Map();            // keyword -> { at, records }
-let lastFetchAt = 0;
+const cache = new Map();            // 查詢鍵 -> { at, records }；Map 保留插入順序，用來做 LRU 淘汰
+const startedAt = Date.now();
 
 /* ---------- 工具 ---------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -49,18 +66,44 @@ function remainingDays(d) {
 }
 function parseBudget(s) {
   if (!s) return 0;
-  const n = String(s).replace(/[^\d.]/g, '');
-  const v = parseFloat(n);
+  // 先去掉千分位與空白，再抓第一段數字；避免 "1.234.567" 被 parseFloat 讀成 1.234
+  const cleaned = String(s).replace(/[,\s]/g, '');
+  const m = cleaned.match(/\d+(?:\.\d+)?/);
+  if (!m) return 0;
+  const v = parseFloat(m[0]);
   return isNaN(v) ? 0 : Math.round(v);
+}
+function intParam(q, name, { min = 0, max = Number.MAX_SAFE_INTEGER, fallback = null } = {}) {
+  const raw = q.get(name);
+  if (raw === null || raw === '') return fallback;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+/* ---------- 快取 ---------- */
+function cacheGet(key) {
+  const hit = cache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at >= CACHE_TTL) { cache.delete(key); return null; }
+  cache.delete(key); cache.set(key, hit);      // 命中就移到尾端，讓最舊的先被淘汰
+  return hit.records;
+}
+function cacheSet(key, records) {
+  cache.set(key, { at: Date.now(), records });
+  for (const [k, v] of cache) {                 // 順手清掉過期的
+    if (Date.now() - v.at >= CACHE_TTL) cache.delete(k);
+  }
+  while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
 }
 
 /* ---------- 抓取與解析 ---------- */
 function decodeHtml(buf, contentType) {
-  const utf = Buffer.from(buf).toString('utf8');
+  const b = Buffer.from(buf);
   const ct = (contentType || '').toLowerCase();
-  if (ct.includes('big5') || /charset=["']?big5/i.test(utf)) {
-    return iconv.decode(Buffer.from(buf), 'big5');
-  }
+  if (ct.includes('big5')) return iconv.decode(b, 'big5');
+  const utf = b.toString('utf8');
+  if (/charset=["']?big5/i.test(utf.slice(0, 2048))) return iconv.decode(b, 'big5');
   return utf;
 }
 
@@ -123,48 +166,70 @@ function parseRows(html) {
   return out;
 }
 
-async function fetchKeyword(keyword, opts = {}) {
-  const key = JSON.stringify([keyword, opts.tenderType, opts.tenderWay, opts.pageSize]);
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < CACHE_TTL) return { records: hit.records, cached: true };
+/* 對官網的請求全部排成一條佇列，確保任何併發情況下間隔都不小於 MIN_GAP */
+let fetchChain = Promise.resolve();
+let lastFetchAt = 0;
+function throttled(fn) {
+  const run = fetchChain.then(async () => {
+    const gap = Date.now() - lastFetchAt;
+    if (gap < MIN_GAP) await sleep(MIN_GAP - gap);
+    lastFetchAt = Date.now();
+    return fn();
+  });
+  fetchChain = run.catch(() => {});   // 一次失敗不要卡住後面的請求
+  return run;
+}
 
-  const gap = Date.now() - lastFetchAt;
-  if (gap < MIN_GAP) await sleep(MIN_GAP - gap);
-  lastFetchAt = Date.now();
+async function fetchKeyword(keyword, opts = {}) {
+  const norm = {
+    tenderType: opts.tenderType || 'TENDER_DECLARATION',
+    tenderWay:  opts.tenderWay  || 'TENDER_WAY_ALL_DECLARATION',
+    pageSize:   Math.min(PAGE_SIZE_MAX, Math.max(1, Number(opts.pageSize) || PAGE_SIZE_MAX))
+  };
+  const key = JSON.stringify([keyword, norm.tenderType, norm.tenderWay, norm.pageSize]);
+
+  const cached = cacheGet(key);
+  if (cached) return { records: cached, cached: true };
 
   const qs = new URLSearchParams({
-    pageSize: String(opts.pageSize || 100),
+    pageSize: String(norm.pageSize),
     firstSearch: 'true',
     searchType: 'basic',
     isBinding: 'N',
     isLogIn: 'N',
     level_1: 'on',
     tenderName: keyword,
-    tenderType: opts.tenderType || 'TENDER_DECLARATION',
-    tenderWay: opts.tenderWay || 'TENDER_WAY_ALL_DECLARATION',
+    tenderType: norm.tenderType,
+    tenderWay: norm.tenderWay,
     dateType: 'isSpdt'   // 只抓等標期內
   });
 
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20000);
-  let resp;
-  try {
-    resp = await fetch(BASE + '?' + qs.toString(), { headers: HEADERS, signal: ctrl.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!resp.ok) throw new Error('官網回應 ' + resp.status + (resp.status === 403 ? '（可能被反爬機制擋下）' : ''));
+  const records = await throttled(async () => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT);
+    let resp;
+    try {
+      resp = await fetch(BASE + '?' + qs.toString(), { headers: HEADERS, signal: ctrl.signal });
+    } catch (e) {
+      throw new Error(e.name === 'AbortError'
+        ? '官網逾時未回應（' + (FETCH_TIMEOUT / 1000) + ' 秒）'
+        : '連線官網失敗：' + e.message);
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!resp.ok) {
+      throw new Error('官網回應 ' + resp.status + (resp.status === 403 ? '（可能被反爬機制擋下，請稍後再試）' : ''));
+    }
+    const buf = await resp.arrayBuffer();
+    return parseRows(decodeHtml(buf, resp.headers.get('content-type')));
+  });
 
-  const buf = await resp.arrayBuffer();
-  const html = decodeHtml(buf, resp.headers.get('content-type'));
-  const records = parseRows(html);
-
-  cache.set(key, { at: Date.now(), records });
+  cacheSet(key, records);
   return { records, cached: false };
 }
 
-/* ---------- 路由 ---------- */
-function json(res, code, body) {
+/* ---------- 回應 ---------- */
+function json(res, code, body, { head = false } = {}) {
   const s = JSON.stringify(body);
   res.writeHead(code, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -173,14 +238,73 @@ function json(res, code, body) {
     'Cache-Control': 'no-store',
     'Content-Length': Buffer.byteLength(s)
   });
-  res.end(s);
+  return head ? res.end() : res.end(s);
 }
 
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.htm':  'text/html; charset=utf-8',
+  '.js':   'text/javascript; charset=utf-8',
+  '.mjs':  'text/javascript; charset=utf-8',
+  '.css':  'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.map':  'application/json; charset=utf-8',
+  '.txt':  'text/plain; charset=utf-8',
+  '.md':   'text/plain; charset=utf-8',
+  '.csv':  'text/csv; charset=utf-8',
+  '.svg':  'image/svg+xml',
+  '.png':  'image/png',
+  '.jpg':  'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif':  'image/gif',
+  '.webp': 'image/webp',
+  '.ico':  'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2':'font/woff2',
+  '.ttf':  'font/ttf',
+  '.pdf':  'application/pdf'
+};
+
+/* 只允許服務 ROOT 底下的一般檔案，且不碰 .git、node_modules 等非公開內容 */
+const BLOCKED = [/(^|[\\/])\.git([\\/]|$)/i, /(^|[\\/])node_modules([\\/]|$)/i, /(^|[\\/])\.env/i];
+
+function resolveStatic(pathname) {
+  let rel;
+  try { rel = decodeURIComponent(pathname); } catch { return null; }
+  if (rel === '/' || rel === '') rel = '/' + INDEX_FILE;
+  if (rel.includes('\0')) return null;
+
+  const full = path.resolve(ROOT, '.' + rel.replace(/\\/g, '/'));
+  // 必須真的落在 ROOT 之內：加上分隔字元才不會讓同前綴的鄰居目錄（如 ..網站-secret）過關
+  if (full !== ROOT && !full.startsWith(ROOT + path.sep)) return null;
+
+  const inside = path.relative(ROOT, full);
+  if (BLOCKED.some(re => re.test(inside))) return null;
+
+  let st;
+  try { st = fs.statSync(full); } catch { return null; }
+  if (!st.isFile()) return null;
+  return { full, size: st.size, mtime: st.mtime };
+}
+
+function serveStatic(res, hit, { head = false } = {}) {
+  const ext = path.extname(hit.full).toLowerCase();
+  res.writeHead(200, {
+    'Content-Type': MIME[ext] || 'application/octet-stream',
+    'Content-Length': hit.size,
+    'Last-Modified': hit.mtime.toUTCString(),
+    'Cache-Control': 'no-cache'
+  });
+  if (head) return res.end();
+  fs.createReadStream(hit.full).on('error', () => res.end()).pipe(res);
+}
+
+/* ---------- 篩選 ---------- */
 function applyFilters(records, q) {
   let r = records.slice();
-  const minBudget = parseInt(q.get('minBudget') || '0', 10);
-  const maxDays = q.get('maxDays') ? parseInt(q.get('maxDays'), 10) : null;
-  const exclude = (q.get('exclude') || '').split(',').map(s => s.trim()).filter(Boolean);
+  const minBudget = intParam(q, 'minBudget', { min: 0, fallback: 0 });
+  const maxDays   = intParam(q, 'maxDays',   { min: 0, fallback: null });
+  const exclude   = (q.get('exclude') || '').split(',').map(s => s.trim()).filter(Boolean);
 
   if (minBudget > 0) r = r.filter(x => x.budget >= minBudget);
   if (maxDays !== null) r = r.filter(x => x.remainingDays !== null && x.remainingDays <= maxDays);
@@ -196,34 +320,59 @@ function applyFilters(records, q) {
   return r;
 }
 
+/* ---------- 路由 ---------- */
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://localhost');
+  const head = req.method === 'HEAD';
 
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET,OPTIONS' });
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': '*',
+      'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS'
+    });
+    return res.end();
+  }
+  if (req.method !== 'GET' && !head) {
+    res.writeHead(405, { 'Allow': 'GET, HEAD, OPTIONS' });
     return res.end();
   }
 
+  let url;
+  try { url = new URL(req.url, 'http://localhost'); }
+  catch { return json(res, 400, { error: '網址格式不正確' }, { head }); }
+
   try {
     if (url.pathname === '/api/health') {
-      return json(res, 200, { ok: true, version: '1.0.0', cachedKeywords: cache.size, time: new Date().toISOString() });
+      return json(res, 200, {
+        ok: true,
+        version: VERSION,
+        node: process.version,
+        cachedKeywords: cache.size,
+        uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
+        time: new Date().toISOString()
+      }, { head });
     }
 
     if (url.pathname === '/api/search') {
       const kw = (url.searchParams.get('keyword') || '').trim();
-      if (!kw) return json(res, 400, { error: '缺少 keyword' });
+      if (!kw) return json(res, 400, { error: '缺少 keyword' }, { head });
       const { records, cached } = await fetchKeyword(kw, {
         tenderType: url.searchParams.get('tenderType') || undefined,
         tenderWay: url.searchParams.get('tenderWay') || undefined,
-        pageSize: parseInt(url.searchParams.get('pageSize') || '100', 10)
+        pageSize: intParam(url.searchParams, 'pageSize', { min: 1, max: PAGE_SIZE_MAX, fallback: PAGE_SIZE_MAX })
       });
       const filtered = applyFilters(records, url.searchParams);
-      return json(res, 200, { keyword: kw, total: records.length, count: filtered.length, cached, records: filtered });
+      return json(res, 200, {
+        keyword: kw, total: records.length, count: filtered.length, cached, records: filtered
+      }, { head });
     }
 
     if (url.pathname === '/api/watch') {
-      const kws = (url.searchParams.get('keywords') || '').split(',').map(s => s.trim()).filter(Boolean);
-      if (!kws.length) return json(res, 400, { error: '缺少 keywords' });
+      const kws = [...new Set((url.searchParams.get('keywords') || '')
+        .split(',').map(s => s.trim()).filter(Boolean))];
+      if (!kws.length) return json(res, 400, { error: '缺少 keywords' }, { head });
+      if (kws.length > 20) return json(res, 400, { error: '關鍵字最多 20 個，請縮小範圍' }, { head });
+
       const seen = new Map();
       const errors = [];
       for (const kw of kws) {
@@ -231,7 +380,8 @@ const server = http.createServer(async (req, res) => {
           const { records } = await fetchKeyword(kw);
           for (const r of records) {
             const k = r.caseId + '|' + r.orgName;
-            if (seen.has(k)) { if (!seen.get(k).matched.includes(kw)) seen.get(k).matched.push(kw); }
+            const prev = seen.get(k);
+            if (prev) { if (!prev.matched.includes(kw)) prev.matched.push(kw); }
             else seen.set(k, { ...r, matched: [kw] });
           }
         } catch (e) { errors.push({ keyword: kw, message: e.message }); }
@@ -241,34 +391,51 @@ const server = http.createServer(async (req, res) => {
         keywords: kws, count: all.length, errors,
         closingSoon: all.filter(x => x.remainingDays !== null && x.remainingDays >= 0 && x.remainingDays <= 14),
         records: all
-      });
+      }, { head });
     }
 
-    // 靜態檔：把同資料夾的 html 一起服務，直接開 http://localhost:5178/
-    let file = url.pathname === '/' ? '/標案參謀室.html' : decodeURIComponent(url.pathname);
-    const full = path.join(__dirname, file);
-    if (full.startsWith(__dirname) && fs.existsSync(full) && fs.statSync(full).isFile()) {
-      const ext = path.extname(full).toLowerCase();
-      const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8' };
-      res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
-      return res.end(fs.readFileSync(full));
+    if (url.pathname.startsWith('/api/')) {
+      return json(res, 404, { error: '沒有這個端點', endpoints: ['/api/health', '/api/search', '/api/watch'] }, { head });
     }
-    return json(res, 404, { error: 'not found' });
+
+    const hit = resolveStatic(url.pathname);
+    if (hit) return serveStatic(res, hit, { head });
+    return json(res, 404, { error: 'not found' }, { head });
 
   } catch (e) {
-    return json(res, 500, { error: e.message });
+    console.error('[error]', url.pathname, e.message);
+    return json(res, 500, { error: e.message }, { head });
   }
 });
 
-export { parseRows, parseRocDate, parseBudget };
+export { parseRows, parseRocDate, parseBudget, resolveStatic, applyFilters };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
-  server.listen(PORT, () => {
+  server.on('error', e => {
+    if (e.code === 'EADDRINUSE') {
+      console.error('\n  連接埠 ' + PORT + ' 已被占用。');
+      console.error('  可能是已經有一個 proxy 在跑（先開 http://localhost:' + PORT + '/ 看看），');
+      console.error('  或改用其他埠：PORT=8080 node server.js\n');
+    } else {
+      console.error('\n  伺服器啟動失敗：' + e.message + '\n');
+    }
+    process.exit(1);
+  });
+
+  server.listen(PORT, HOST, () => {
     console.log('');
-    console.log('  標案參謀室 proxy 已啟動');
+    console.log('  標案參謀室 proxy v' + VERSION + ' 已啟動');
     console.log('  網頁：    http://localhost:' + PORT + '/');
     console.log('  健康檢查：http://localhost:' + PORT + '/api/health');
     console.log('  按 Ctrl+C 結束');
     console.log('');
   });
+
+  for (const sig of ['SIGINT', 'SIGTERM']) {
+    process.on(sig, () => {
+      console.log('\n  正在關閉…');
+      server.close(() => process.exit(0));
+      setTimeout(() => process.exit(0), 3000);
+    });
+  }
 }
