@@ -1,0 +1,14 @@
+{
+  "name": "tender-hq-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "標案參謀室 官網即時查 proxy",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "iconv-lite": "^0.6.3"
+  },
+  "engines": { "node": ">=20" }
+}

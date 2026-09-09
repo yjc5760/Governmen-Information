@@ -1,0 +1,17 @@
+# 相依套件（npm install 可重建）
+node_modules/
+
+# 舊備份 HTML（改用 git 版控，不再用複製檔案留版本）
+*.backup-*.html
+*.backup.html
+
+# 執行期產物
+*.log
+npm-debug.log*
+
+# 作業系統與編輯器
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
