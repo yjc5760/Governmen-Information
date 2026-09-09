@@ -13,13 +13,6 @@ tailwind.config = { theme: { extend: { colors: {
 } } } }
 </script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
-<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
 <style>
   body { background:#EDF2F1; }
   ::-webkit-scrollbar { width:6px; height:6px; }
@@ -27,16 +20,6 @@ tailwind.config = { theme: { extend: { colors: {
   .eyebrow { letter-spacing:.14em; font-size:11px; font-weight:700; color:#0F7168; }
   .card { background:#fff; border-radius:14px; box-shadow:0 1px 2px rgba(16,63,59,.06); }
   .tag { display:inline-block; padding:3px 12px; border-radius:999px; font-size:11px; font-weight:600; }
-  .prose h1 { font-size:1.4rem; font-weight:700; margin:1.4rem 0 .7rem; color:#103F3B; border-bottom:2px solid #DCEDE9; padding-bottom:.3rem; }
-  .prose h2 { font-size:1.2rem; font-weight:600; margin:1.1rem 0 .5rem; color:#1f2937; }
-  .prose h3 { font-size:1.03rem; font-weight:600; margin:.9rem 0 .25rem; color:#374151; }
-  .prose p { margin-bottom:.7rem; line-height:1.75; color:#334155; }
-  .prose ul { list-style:disc; margin-left:1.5rem; margin-bottom:.7rem; }
-  .prose ol { list-style:decimal; margin-left:1.5rem; margin-bottom:.7rem; }
-  .prose li { margin-bottom:.2rem; }
-  .prose table { width:100%; border-collapse:collapse; margin-bottom:1rem; font-size:.85rem; }
-  .prose th,.prose td { border:1px solid #cbd5e1; padding:.4rem .6rem; text-align:left; vertical-align:top; }
-  .prose th { background:#EEF4F2; font-weight:600; }
   .navitem { display:flex; align-items:center; gap:.75rem; padding:.6rem .9rem; border-radius:10px; font-size:.9rem; color:#cfe0dc; cursor:pointer; }
   .navitem:hover { background:rgba(255,255,255,.06); }
   .navitem.active { background:rgba(21,145,131,.18); color:#fff; font-weight:600; box-shadow:inset 3px 0 0 #159183; }
@@ -81,35 +64,6 @@ tailwind.config = { theme: { extend: { colors: {
       <button onclick="testProxy()" class="px-3 py-2 text-xs border rounded-lg hover:bg-slate-50"><i class="fa-solid fa-plug mr-1"></i>測試 proxy</button>
     </div>
 
-    <div class="space-y-3 pt-3 border-t">
-      <div class="eyebrow">AI 模型（建議書工作台用）</div>
-      <div>
-        <label class="block text-xs font-semibold text-slate-600 mb-1">Gemini API Key</label>
-        <input type="password" id="apiKeyInput" placeholder="AIza..." class="w-full text-sm px-3 py-2 border rounded-lg">
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">模型</label>
-          <select id="modelSelect" class="w-full text-sm p-2 border rounded-lg bg-white">
-            <option value="gemini-3-flash-preview">gemini-3-flash-preview</option>
-            <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview</option>
-            <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite</option>
-            <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-            <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-            <option value="__custom__">自行輸入…</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">自訂模型名稱</label>
-          <input type="text" id="customModelInput" class="w-full text-sm px-3 py-2 border rounded-lg">
-        </div>
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-slate-600 mb-1">送出文件字數上限</label>
-        <input type="number" id="corpusBudgetInput" value="60000" min="5000" step="5000" class="w-full text-sm px-3 py-2 border rounded-lg">
-      </div>
-    </div>
-
     <div class="flex justify-end gap-2 pt-3 border-t">
       <button onclick="modal('settingsModal',false)" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">取消</button>
       <button onclick="saveSettingsModal()" class="px-4 py-2 text-sm bg-jade-600 hover:bg-jade-700 text-white rounded-lg font-medium">儲存</button>
@@ -131,20 +85,25 @@ tailwind.config = { theme: { extend: { colors: {
     <div class="p-4 border-t flex flex-wrap gap-2 bg-slate-50 sm:rounded-b-2xl">
       <button id="tmTrackBtn" onclick="toggleTrackCurrent()" class="px-3 py-2 text-xs border rounded-lg bg-white hover:bg-slate-50"><i class="fa-regular fa-bookmark mr-1"></i>加入追蹤</button>
       <button onclick="addCompareCurrent()" class="px-3 py-2 text-xs border rounded-lg bg-white hover:bg-slate-50"><i class="fa-solid fa-code-compare mr-1"></i>加入比較</button>
-      <button onclick="sendToAi()" class="px-3 py-2 text-xs bg-ink-800 hover:bg-ink-900 text-white rounded-lg"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>送進 AI 工作台</button>
+      <button onclick="agencyFromTender()" class="px-3 py-2 text-xs border rounded-lg bg-white hover:bg-slate-50"><i class="fa-solid fa-building-columns mr-1"></i>機關採購輪廓</button>
       <a id="tmSourceLink" href="#" target="_blank" rel="noopener" class="px-3 py-2 text-xs border rounded-lg bg-white hover:bg-slate-50 hidden"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>採購網原文</a>
     </div>
   </div>
 </div>
 
-<!-- ===== 文件抽查 ===== -->
-<div id="docPreviewModal" class="fixed inset-0 bg-black/50 z-[65] hidden items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-5 space-y-3 max-h-[85vh] flex flex-col">
-    <div class="flex justify-between items-center border-b pb-3">
-      <h3 id="docPreviewTitle" class="text-sm font-bold text-ink-900 truncate pr-4"></h3>
-      <button onclick="modal('docPreviewModal',false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+<!-- ===== 廠商 × 機關 得標案件 ===== -->
+<div id="vendorModal" class="fixed inset-0 bg-black/50 z-[66] hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[88vh] flex flex-col">
+    <div class="flex justify-between items-start gap-3 p-5 border-b">
+      <div class="min-w-0">
+        <div class="eyebrow">AGENCY AWARD CASES</div>
+        <h3 id="vmTitle" class="text-base font-bold text-ink-900 mt-1 leading-snug"></h3>
+      </div>
+      <button onclick="modal('vendorModal',false)" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-xl"></i></button>
     </div>
-    <pre id="docPreviewBody" class="flex-1 overflow-auto text-[11px] leading-relaxed whitespace-pre-wrap font-mono bg-slate-50 p-3 rounded-lg border"></pre>
+    <div id="vmStats" class="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100 border-b bg-slate-50/60"></div>
+    <div id="vmBody" class="flex-1 overflow-y-auto p-4 space-y-2"></div>
+    <div id="vmFoot" class="p-4 border-t bg-slate-50 rounded-b-2xl flex items-center gap-2 flex-wrap"></div>
   </div>
 </div>
 
@@ -176,7 +135,6 @@ tailwind.config = { theme: { extend: { colors: {
   </div>
   <div class="navitem" data-page="tracked"><i class="fa-regular fa-bookmark w-4"></i>追蹤清單 <span id="navTrackCount" class="ml-auto text-[11px] bg-jade-600 text-white px-1.5 rounded"></span></div>
   <div class="navitem" data-page="compare"><i class="fa-solid fa-scale-balanced w-4"></i>標案比較 <span id="navCompareCount" class="ml-auto text-[11px] bg-jade-600 text-white px-1.5 rounded"></span></div>
-  <div class="navitem" data-page="ai"><i class="fa-solid fa-feather-pointed w-4"></i>AI 建議書工作台</div>
 
   <div class="mt-auto space-y-2">
     <div id="apiStatus" class="text-[11px] text-white/50 px-3 py-2 rounded-lg bg-white/5">資料來源：g0v 標案 API</div>
@@ -342,12 +300,14 @@ tailwind.config = { theme: { extend: { colors: {
     <section data-view="agencies" hidden>
       <div class="card p-5 mb-4">
         <div class="eyebrow">AGENCY INSIGHT</div>
-        <p class="text-xs text-slate-500 mt-2">統計來自已同步的公告快取。想看更長期間，先到總覽把天數拉長再同步。</p>
+        <h3 class="font-bold text-ink-900 mt-1">選一個機關，看它歷年發包給誰</h3>
+        <p class="text-xs text-slate-500 mt-1">選定後會直接向 API 抓該機關的<strong>全期間</strong>公告，不受同步天數限制。下方清單來自快取；想看沒同步到的機關，在標案詳情按「機關採購輪廓」也能進來。</p>
         <div class="flex gap-2 mt-3">
           <input id="agencyFilter" type="text" placeholder="篩選機關名稱，例如：台灣電力" class="flex-1 px-3 py-2 border rounded-xl text-sm">
           <button onclick="renderAgencies()" class="px-4 py-2 bg-jade-600 text-white rounded-xl text-sm font-medium">篩選</button>
         </div>
       </div>
+      <div id="agencyDetail" class="hidden space-y-4 mb-4"></div>
       <div id="agencyList" class="space-y-2"></div>
     </section>
 
@@ -405,177 +365,6 @@ tailwind.config = { theme: { extend: { colors: {
       </div>
     </section>
 
-    <!-- ===== AI 工作台 ===== -->
-    <section data-view="ai" hidden>
-      <div class="card overflow-hidden mb-4">
-        <nav class="flex overflow-x-auto border-b">
-          <button id="stepTabBtn1" onclick="switchStep(1)" class="px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 border-jade-600 text-jade-700">1 上傳資料</button>
-          <button id="stepTabBtn2" onclick="switchStep(2)" class="px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 border-transparent text-slate-500">2 排版樣式</button>
-          <button id="stepTabBtn3" onclick="switchStep(3)" class="px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 border-transparent text-slate-500">3 AI 撰稿</button>
-          <button id="stepTabBtn4" onclick="switchStep(4)" class="px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 border-transparent text-slate-500">4 檢視匯出</button>
-        </nav>
-      </div>
-
-      <!-- Step 1 -->
-      <div id="stepSection1" class="card p-5">
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-          <div><h3 class="font-bold text-ink-900">上傳招標資料</h3>
-            <p class="text-xs text-slate-500 mt-1">PDF、Word、Excel／ODS、ZIP、TXT、Markdown，在瀏覽器裡直接擷取文字。</p></div>
-          <div class="flex gap-2 text-xs text-slate-500">
-            <span class="bg-slate-100 px-3 py-1.5 rounded-lg border"><strong id="step1FileCount" class="text-jade-700 font-mono">0</strong> 個檔案</span>
-            <span class="bg-slate-100 px-3 py-1.5 rounded-lg border"><strong id="step1TotalWords" class="text-jade-700 font-mono">0</strong> 字</span>
-          </div>
-        </div>
-        <div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
-          <i class="fa-solid fa-shield-halved mr-1"></i>解析在本機完成，但按下 AI 功能時擷取的文字會送到 Google。機密文件請自行斟酌。
-        </div>
-        <div id="dropZone" class="mt-4 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:border-jade-500 hover:bg-jade-50/40 transition cursor-pointer">
-          <div class="w-14 h-14 mx-auto rounded-full bg-jade-50 text-jade-600 flex items-center justify-center text-2xl"><i class="fa-solid fa-cloud-arrow-up"></i></div>
-          <div class="text-sm font-semibold text-slate-800 mt-3">點擊選擇檔案，或拖曳到這裡</div>
-          <div class="text-xs text-slate-400 mt-1">.pdf .docx .xlsx .xls .ods .csv .zip .txt .md</div>
-          <input type="file" id="fileInput" multiple accept=".pdf,.docx,.xlsx,.xls,.ods,.csv,.zip,.txt,.md" class="hidden">
-        </div>
-        <div class="mt-5">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-xs font-bold text-slate-700">已解析文件庫</span>
-            <button onclick="clearAllDocuments()" class="text-xs text-rose-500 hover:text-rose-700"><i class="fa-regular fa-trash-can mr-1"></i>清空</button>
-          </div>
-          <div class="border rounded-xl overflow-hidden">
-            <div id="emptyFileTip" class="p-8 text-center text-xs text-slate-400">還沒有文件。可以上傳 RFP，也可以從標案詳情按「送進 AI 工作台」。</div>
-            <div id="fileTableList" class="divide-y divide-slate-100 hidden max-h-64 overflow-y-auto"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Step 2 -->
-      <div id="stepSection2" class="card p-5 hidden">
-        <h3 class="font-bold text-ink-900 border-b pb-4">排版樣式與標案基本資訊</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
-          <div class="space-y-3 border rounded-xl p-4 bg-slate-50/60">
-            <div class="eyebrow">封面與檔頭</div>
-            <div><label class="block text-xs font-semibold text-slate-600 mb-1">標案名稱</label>
-              <input type="text" id="projectTitle" class="w-full text-xs px-3 py-2 bg-white border rounded-lg"></div>
-            <div><label class="block text-xs font-semibold text-slate-600 mb-1">招標機關</label>
-              <input type="text" id="agencyName" class="w-full text-xs px-3 py-2 bg-white border rounded-lg"></div>
-            <div><label class="block text-xs font-semibold text-slate-600 mb-1">投標廠商／團隊</label>
-              <input type="text" id="vendorName" class="w-full text-xs px-3 py-2 bg-white border rounded-lg"></div>
-            <div><label class="block text-xs font-semibold text-slate-600 mb-1">我方核心優勢（供 AI 引用）</label>
-              <textarea id="customIntent" rows="4" class="w-full text-xs p-2.5 bg-white border rounded-lg"></textarea></div>
-          </div>
-          <div class="space-y-3 border rounded-xl p-4 bg-slate-50/60">
-            <div class="eyebrow">Word 規範參數</div>
-            <div class="grid grid-cols-2 gap-3 text-xs">
-              <div><label class="font-semibold text-slate-600">中文字型</label>
-                <select id="docFontChinese" class="w-full mt-1 p-2 border rounded-lg bg-white">
-                  <option value="Microsoft JhengHei">微軟正黑體</option><option value="DFKai-SB">標楷體</option>
-                  <option value="PMingLiU">新細明體</option><option value="Noto Sans TC">思源黑體</option><option value="Noto Serif TC">思源宋體</option>
-                </select></div>
-              <div><label class="font-semibold text-slate-600">英文字型</label>
-                <select id="docFontEnglish" class="w-full mt-1 p-2 border rounded-lg bg-white">
-                  <option value="Calibri">Calibri</option><option value="Arial">Arial</option><option value="Times New Roman">Times New Roman</option>
-                </select></div>
-              <div><label class="font-semibold text-slate-600">一級章名 (pt)</label><input type="number" id="h1Size" value="18" class="w-full mt-1 p-2 border rounded-lg bg-white"></div>
-              <div><label class="font-semibold text-slate-600">二級節名 (pt)</label><input type="number" id="h2Size" value="14" class="w-full mt-1 p-2 border rounded-lg bg-white"></div>
-              <div><label class="font-semibold text-slate-600">內文 (pt)</label><input type="number" id="bodySize" value="12" class="w-full mt-1 p-2 border rounded-lg bg-white"></div>
-              <div><label class="font-semibold text-slate-600">行距</label>
-                <select id="docLineSpacing" class="w-full mt-1 p-2 border rounded-lg bg-white">
-                  <option value="240">1.0</option><option value="280">1.2</option><option value="360" selected>1.5</option><option value="420">1.75</option>
-                </select></div>
-              <div class="col-span-2"><label class="font-semibold text-slate-600">版面留白</label>
-                <select id="docMarginType" class="w-full mt-1 p-2 border rounded-lg bg-white">
-                  <option value="normal">標準（四邊 2.54 cm）</option><option value="binding">裝訂（左 3.18 cm）</option>
-                </select></div>
-              <div class="col-span-2 space-y-2 pt-2 border-t">
-                <label class="flex items-center gap-2"><input type="checkbox" id="optCoverPage" checked class="rounded text-jade-600">產生封面頁</label>
-                <label class="flex items-center gap-2"><input type="checkbox" id="optToc" class="rounded text-jade-600">插入自動目錄（Word 內 Ctrl+A 再 F9 更新）</label>
-                <label class="flex items-center gap-2"><input type="checkbox" id="optChapterBreak" checked class="rounded text-jade-600">一級章名另起新頁</label>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Step 3 -->
-      <div id="stepSection3" class="card p-5 hidden">
-        <h3 class="font-bold text-ink-900 border-b pb-4">AI 輔助撰稿</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-          <button onclick="runAiTask('analysis')" class="ai-task-btn text-left border rounded-xl p-4 hover:border-jade-500 hover:bg-jade-50/40 transition">
-            <div class="font-bold text-sm text-ink-900">需求與痛點解讀</div>
-            <div class="text-[11px] text-slate-500 mt-1">機關目的、必備規格、驗收門檻與履約風險</div></button>
-          <button onclick="runAiTask('scoring')" class="ai-task-btn text-left border rounded-xl p-4 hover:border-jade-500 hover:bg-jade-50/40 transition">
-            <div class="font-bold text-sm text-ink-900">評選配分與致勝佈局</div>
-            <div class="text-[11px] text-slate-500 mt-1">配分權重拆解與差異化亮點</div></button>
-          <button onclick="runAiTask('outline')" class="ai-task-btn text-left border rounded-xl p-4 hover:border-jade-500 hover:bg-jade-50/40 transition">
-            <div class="font-bold text-sm text-ink-900">建議書章節大綱</div>
-            <div class="text-[11px] text-slate-500 mt-1">工程會標準架構與頁數配比</div></button>
-          <button onclick="runAiTask('qa')" class="ai-task-btn text-left border rounded-xl p-4 hover:border-jade-500 hover:bg-jade-50/40 transition">
-            <div class="font-bold text-sm text-ink-900">評選攻防錦囊</div>
-            <div class="text-[11px] text-slate-500 mt-1">五大質疑與應答說詞</div></button>
-        </div>
-        <button onclick="runAiTask('draft')" class="ai-task-btn w-full mt-3 py-3 rounded-xl bg-jade-700 hover:bg-jade-600 text-white font-semibold text-sm">
-          <i class="fa-solid fa-bolt mr-1"></i>一鍵起草完整建議書底稿
-        </button>
-
-        <div class="mt-5 border rounded-xl p-4">
-          <div class="flex items-center justify-between flex-wrap gap-2">
-            <div class="eyebrow">自訂指令</div>
-            <div class="flex gap-2">
-              <select id="promptTemplateSelect" onchange="loadPromptTemplate()" class="text-[11px] p-1.5 border rounded-lg bg-white max-w-[160px]"></select>
-              <button onclick="savePromptTemplate()" class="text-[11px] px-2 py-1.5 border rounded-lg">存範本</button>
-              <button onclick="deletePromptTemplate()" class="text-[11px] px-2 py-1.5 border rounded-lg text-rose-600">刪除</button>
-            </div>
-          </div>
-          <textarea id="customPromptInput" rows="4" placeholder="用自己的話下指令。已勾選的文件會自動附在後面。" class="w-full mt-3 text-xs p-2.5 border rounded-lg"></textarea>
-          <div class="mt-3 flex justify-end">
-            <button onclick="runAiTask('custom')" class="ai-task-btn px-4 py-2 text-xs bg-ink-800 text-white rounded-lg font-medium">執行自訂指令</button>
-          </div>
-        </div>
-
-        <div id="aiGeneratingBar" class="hidden mt-4 p-3 bg-jade-50 border border-jade-100 rounded-lg text-xs text-jade-700 flex items-center justify-between gap-3">
-          <span class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin"></i><span id="aiGeneratingText"></span></span>
-          <div class="flex items-center gap-3"><span id="aiModelBadge" class="font-mono text-[11px]"></span>
-            <button onclick="cancelAiTask()" class="px-2 py-1 border border-jade-300 rounded">中止</button></div>
-        </div>
-      </div>
-
-      <!-- Step 4 -->
-      <div id="stepSection4" class="card p-5 hidden flex flex-col min-h-[640px]">
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-          <h3 class="font-bold text-ink-900">檢視草稿與匯出</h3>
-          <div class="flex items-center gap-2">
-            <div class="bg-slate-100 p-1 rounded-lg flex text-xs">
-              <button id="viewTabPreview" onclick="setDraftViewTab('preview')" class="px-3 py-1 rounded bg-white shadow-sm font-semibold text-slate-800">預覽</button>
-              <button id="viewTabEditor" onclick="setDraftViewTab('editor')" class="px-3 py-1 rounded text-slate-600 font-medium">編輯</button>
-              <button id="viewTabChecklist" onclick="setDraftViewTab('checklist')" class="px-3 py-1 rounded text-slate-600 font-medium">檢核</button>
-            </div>
-            <button onclick="copyCurrentDraft()" class="p-2 text-xs border rounded-lg"><i class="fa-regular fa-copy"></i></button>
-            <button onclick="downloadDraftMarkdown()" class="p-2 text-xs border rounded-lg"><i class="fa-brands fa-markdown"></i></button>
-            <button onclick="exportWordDocx()" class="px-3 py-2 text-xs bg-jade-600 hover:bg-jade-700 text-white rounded-lg font-semibold"><i class="fa-solid fa-download mr-1"></i>Word</button>
-          </div>
-        </div>
-        <div id="outputTabsBar" class="flex gap-2 mt-3 overflow-x-auto pb-1"></div>
-        <div class="flex-1 flex flex-col mt-3 overflow-hidden">
-          <div id="panePreview" class="prose max-w-none flex-1 overflow-y-auto pr-2 text-sm"></div>
-          <textarea id="paneEditor" oninput="handleEditorChange()" class="hidden w-full flex-1 p-4 font-mono text-xs border rounded-lg resize-none leading-relaxed"></textarea>
-          <div id="paneChecklist" class="hidden flex-1 overflow-y-auto space-y-3 text-xs">
-            <div id="checklistItemsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
-            <div class="flex gap-2 pt-2">
-              <input type="text" id="newChecklistInput" placeholder="新增檢核項目…" class="flex-1 text-xs px-3 py-2 border rounded-lg">
-              <button onclick="addChecklistItem()" class="px-3 py-2 text-xs bg-ink-800 text-white rounded-lg">新增</button>
-            </div>
-          </div>
-        </div>
-        <div id="followUpBar" class="mt-3 flex gap-2">
-          <input type="text" id="followUpInput" placeholder="針對這份稿子追加指示…" class="flex-1 text-xs px-3 py-2 border rounded-lg">
-          <button onclick="runFollowUp()" class="ai-task-btn px-4 py-2 text-xs bg-jade-600 text-white rounded-lg font-medium whitespace-nowrap">改寫</button>
-        </div>
-        <div class="mt-3 pt-3 border-t flex flex-wrap justify-between text-xs text-slate-500 gap-2">
-          <span>字數：<strong id="draftCharacterCount" class="font-mono text-jade-700">0</strong></span>
-          <span id="currentSettingSummary"></span>
-        </div>
-      </div>
-    </section>
-
     <footer class="text-center text-[11px] text-slate-400 py-6 space-x-2">
       <span>標案資料來源：行政院公共工程委員會政府電子採購網（經 g0v 標案 API）</span><br>
       <button onclick="exportBackup()" class="underline hover:text-slate-600">匯出備份</button>
@@ -593,11 +382,9 @@ const LS = {
   set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true;}catch(e){return false;} },
   del(k){ try{ localStorage.removeItem(k);}catch(e){} }
 };
-const K = { BASE:'pi_api_base', TOKEN:'pi_api_token', KEY:'pi_gemini_key', MODEL:'pi_model', CUSTOM_MODEL:'pi_custom_model',
-  BUDGET:'pi_budget', DOCS:'pi_docs', OUTPUTS:'pi_outputs', ACTIVE:'pi_active_output', SETTINGS:'pi_settings',
-  CHECKLIST:'pi_checklist', TEMPLATES:'pi_templates', CUSTOM_PROMPT:'pi_custom_prompt',
+const K = { BASE:'pi_api_base', TOKEN:'pi_api_token',
   DAYCACHE:'pi_daycache', TRACKED:'pi_tracked', COMPARE:'pi_compare',
-  PROXY:'pi_proxy_base', WATCH:'pi_watch_keywords' };
+  PROXY:'pi_proxy_base', WATCH:'pi_watch_keywords', AMOUNT:'pi_amount_cache' };
 
 /* pcc-viewer 公開設定檔裡的那組 token 已被 API 端擋掉（回 403）。
    openfun 這支 API 目前不帶 token 也能公開查詢，所以預設不送 Authorization。
@@ -609,28 +396,15 @@ const apiToken = () => { const t = LS.get(K.TOKEN, DEFAULT_TOKEN); return (t && 
 (function(){ const t = LS.get(K.TOKEN, null); if(t && REVOKED_TOKENS.indexOf(t)>=0) LS.del(K.TOKEN); })();
 
 /* ================= 狀態 ================= */
-let documentVault = LS.get(K.DOCS, []);
-let outputs       = LS.get(K.OUTPUTS, []);
-let activeOutputId= LS.get(K.ACTIVE, null);
-let promptTemplates=LS.get(K.TEMPLATES, []);
 let dayCache      = LS.get(K.DAYCACHE, {});      // {'20260905':[{u,n,j,t,ty,f}]}
 let tracked       = LS.get(K.TRACKED, []);        // [{unit_id,job_number,unit_name,title,date,deadline,budget,type}]
 let compareList   = LS.get(K.COMPARE, []);
 let watchKeywords = LS.get(K.WATCH, []);
+let amountCache   = LS.get(K.AMOUNT, {});   // 'unit_id|job_number' -> {a:決標金額, d:決標日期, b:預算}
 let proxyOk       = false;
 let currentTender = null;
-let currentAbort  = null;
 let calCursor     = new Date();
 let searchState   = { mode:'title', query:'', page:1 };
-
-const DEFAULT_CHECKLIST = ['招標規範的強制要求與基本資格是否 100% 滿足？','投標廠商名稱、印章、代表人是否與登記證照一致？',
-  '建議書總頁數是否符合招標文件限制？','主持人與主要人力的履歷、證照、佐證是否齊備？','標價清單與經費分析表加總是否與投標總價吻合？',
-  '評選評分表的每個項目是否都有獨立章節對應？','資安、個資保護與弱點檢測規劃是否符合規範？','緊急應變、保固維運承諾與違約責任是否已確認？'];
-let checklist = LS.get(K.CHECKLIST, DEFAULT_CHECKLIST.map(t=>({text:t,checked:false})));
-
-const SETTING_FIELDS = ['projectTitle','agencyName','vendorName','customIntent','docFontChinese','docFontEnglish','h1Size','h2Size','bodySize','docLineSpacing','docMarginType'];
-const CHECK_FIELDS = ['optCoverPage','optToc','optChapterBreak'];
-if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 /* ================= 小工具 ================= */
 function esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':String(s); return d.innerHTML; }
@@ -649,10 +423,6 @@ function modal(id,show){ const m=document.getElementById(id); m.classList.toggle
     document.getElementById('apiBaseInput').value=apiBase();
     document.getElementById('proxyBaseInput').value=proxyBase();
     document.getElementById('apiTokenInput').value=apiToken();
-    document.getElementById('apiKeyInput').value=LS.get(K.KEY,'');
-    document.getElementById('modelSelect').value=LS.get(K.MODEL,'gemini-3-flash-preview');
-    document.getElementById('customModelInput').value=LS.get(K.CUSTOM_MODEL,'');
-    document.getElementById('corpusBudgetInput').value=LS.get(K.BUDGET,60000);
   } }
 function openDrawer(){ document.getElementById('drawer').classList.remove('-translate-x-full'); document.getElementById('drawerBackdrop').classList.remove('hidden'); }
 function closeDrawer(){ document.getElementById('drawer').classList.add('-translate-x-full'); document.getElementById('drawerBackdrop').classList.add('hidden'); }
@@ -704,11 +474,6 @@ function saveSettingsModal(){
   LS.set(K.BASE,document.getElementById('apiBaseInput').value);
   LS.set(K.PROXY,document.getElementById('proxyBaseInput').value.trim()||'http://localhost:5178');
   LS.set(K.TOKEN,document.getElementById('apiTokenInput').value.trim());
-  LS.set(K.KEY,document.getElementById('apiKeyInput').value.trim());
-  LS.set(K.MODEL,document.getElementById('modelSelect').value);
-  LS.set(K.CUSTOM_MODEL,document.getElementById('customModelInput').value.trim());
-  LS.set(K.BUDGET,parseInt(document.getElementById('corpusBudgetInput').value,10)||60000);
-  document.getElementById('aiModelBadge').textContent=getModel();
   modal('settingsModal',false); toast('設定已儲存','success');
 }
 
@@ -769,7 +534,6 @@ function liveCard(x){
         '<div class="text-[11px] text-slate-400 mt-2 font-mono">'+esc(x.caseId)+(x.tenderPeriod?(' · 等標期 '+x.tenderPeriod+' 天'):'')+'</div>'+
         '<div class="flex flex-wrap gap-2 mt-3">'+
           '<button class="px-2.5 py-1.5 text-[11px] border rounded-lg bg-white" data-act="track"></button>'+
-          '<button class="px-2.5 py-1.5 text-[11px] border rounded-lg bg-white" data-act="ai"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>送進 AI</button>'+
           (x.link?'<a href="'+esc(x.link)+'" target="_blank" rel="noopener" class="px-2.5 py-1.5 text-[11px] border rounded-lg bg-white"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>官網</a>':'')+
         '</div>'+
       '</div>'+
@@ -780,7 +544,6 @@ function liveCard(x){
     tb.innerHTML=on?'<i class="fa-solid fa-bookmark mr-1"></i>已追蹤':'<i class="fa-regular fa-bookmark mr-1"></i>追蹤'; };
   setLabel();
   tb.onclick=()=>{ toggleTrackLive(x); setLabel(); };
-  el.querySelector('[data-act="ai"]').onclick=()=>sendLiveToAi(x);
   return el;
 }
 function toggleTrackLive(x){
@@ -792,19 +555,6 @@ function toggleTrackLive(x){
     toast('已加入追蹤','success');
   }
   LS.set(K.TRACKED,tracked); updateCounters();
-}
-function sendLiveToAi(x){
-  let text='=== 標案公告（官網即時查）===\n機關：'+x.orgName+'\n標案名稱：'+x.name+'\n標案案號：'+x.caseId+
-    '\n招標方式：'+(x.tenderWay||'')+'\n採購性質：'+(x.tenderType||'')+'\n公告日期：'+(x.publishDate||'')+
-    '\n截止投標：'+(x.deadline||'')+'\n預算金額：'+(x.budget?x.budget.toLocaleString():'未提供')+
-    '\n等標期：'+(x.tenderPeriod||'—')+' 天\n連結：'+(x.link||'')+'\n';
-  documentVault.push({id:Date.now()+'-'+Math.random().toString(36).slice(2,7),name:'[公告] '+x.name,ext:'txt',
-    size:text.length,text,wordCount:text.length,selected:true});
-  persistDocs(); renderFileTable();
-  document.getElementById('projectTitle').value=x.name;
-  document.getElementById('agencyName').value=x.orgName;
-  saveSettings(); go('ai'); switchStep(1);
-  toast('已放進文件庫。招標文件請另外下載上傳，公告摘要資訊有限。','info');
 }
 async function doLiveSearch(){
   const kw=document.getElementById('liveKeyword').value.trim();
@@ -861,7 +611,7 @@ async function runWatch(){
 }
 
 /* ================= 導覽 ================= */
-const PAGE_TITLE={overview:'總覽',tenders:'標案情報中心',live:'官網即時查',agencies:'機關洞察',market:'市場與廠商',calendar:'採購行事曆',tracked:'追蹤清單',compare:'標案比較',ai:'AI 建議書工作台'};
+const PAGE_TITLE={overview:'總覽',tenders:'標案情報中心',live:'官網即時查',agencies:'機關洞察',market:'市場與廠商',calendar:'採購行事曆',tracked:'追蹤清單',compare:'標案比較'};
 function go(page){
   document.querySelectorAll('[data-view]').forEach(s=>s.hidden = s.dataset.view!==page);
   document.querySelectorAll('.navitem').forEach(n=>n.classList.toggle('active', n.dataset.page===page));
@@ -1075,6 +825,11 @@ function renderTenderBody(){
   }
   document.getElementById('tmBody').innerHTML=html;
 }
+function agencyFromTender(){
+  if(!currentTender) return;
+  modal('tenderModal',false);
+  openAgency(currentTender.unit_id,currentTender.unit_name);
+}
 function trackKey(t){ return t.unit_id+'|'+t.job_number; }
 function isTracked(t){ return tracked.some(x=>trackKey(x)===trackKey(t)); }
 function refreshTrackBtn(){
@@ -1102,26 +857,12 @@ function addCompareCurrent(){
              '履約地點':pick(detail,['履約地點']), '金額級距':pick(detail,['金額級距']) }});
   LS.set(K.COMPARE,compareList); updateCounters(); toast('已加入比較（'+compareList.length+'/4）','success');
 }
-function sendToAi(){
-  if(!currentTender) return;
-  const t=currentTender;
-  let text='=== 標案公告：'+t.title+' ===\n機關：'+t.unit_name+'\n案號：'+t.job_number+'\n';
-  Object.keys(t.detail).forEach(k=>{ if(t.detail[k]) text+=k+'：'+t.detail[k]+'\n'; });
-  documentVault.push({id:Date.now()+'-'+Math.random().toString(36).slice(2,7),name:'[公告] '+t.title,ext:'txt',size:text.length,text,wordCount:text.length,selected:true});
-  persistDocs(); renderFileTable();
-  document.getElementById('projectTitle').value=t.title;
-  document.getElementById('agencyName').value=t.unit_name;
-  saveSettings();
-  modal('tenderModal',false); go('ai'); switchStep(3);
-  toast('公告內容已放進文件庫','success');
-}
-
 /* ================= 機關洞察 ================= */
 function renderAgencies(){
   const filter=(document.getElementById('agencyFilter').value||'').trim();
   const recs=cacheRecords();
   const box=document.getElementById('agencyList');
-  if(!recs.length){ box.innerHTML='<div class="card p-8 text-center text-sm text-slate-400">還沒有快取資料。到總覽按「開始同步」。</div>'; return; }
+  if(!recs.length){ box.innerHTML='<div class="card p-8 text-center text-sm text-slate-400">快取裡還沒有資料。到總覽按「開始同步」，或直接在標案情報中心開一筆標案，按「機關採購輪廓」進來。</div>'; return; }
   const map={};
   recs.forEach(r=>{ if(filter&&r.n.indexOf(filter)<0) return;
     if(!map[r.n]) map[r.n]={name:r.n,unit_id:r.u,total:0,tender:0,award:0};
@@ -1135,28 +876,278 @@ function renderAgencies(){
   list.forEach((m,i)=>{
     const el=document.createElement('div');
     el.className='card p-4 cursor-pointer hover:shadow-md transition';
-    el.onclick=()=>listByUnit(m.unit_id,m.name);
+    el.onclick=()=>openAgency(m.unit_id,m.name);
     el.innerHTML='<div class="flex items-center gap-3">'+
       '<div class="w-7 h-7 rounded-lg bg-jade-50 text-jade-700 text-xs font-bold flex items-center justify-center flex-shrink-0">'+(i+1)+'</div>'+
       '<div class="flex-1 min-w-0"><div class="text-sm font-semibold text-ink-900 truncate">'+esc(m.name)+'</div>'+
       '<div class="h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden"><div class="h-full bg-jade-500 rounded-full" style="width:'+(m.total/max*100)+'%"></div></div>'+
-      '<div class="text-[11px] text-slate-500 mt-1.5">共 '+m.total+' 則 · 招標 '+m.tender+' · 決標 '+m.award+'</div></div>'+
+      '<div class="text-[11px] text-slate-500 mt-1.5">快取內 '+m.total+' 則 · 招標 '+m.tender+' · 決標 '+m.award+'</div></div>'+
       '<i class="fa-solid fa-chevron-right text-slate-300"></i></div>';
     box.appendChild(el);
   });
 }
-async function listByUnit(unit_id,name){
-  go('tenders');
-  document.getElementById('searchQuery').value='';
-  const meta=document.getElementById('searchMeta'), list=document.getElementById('searchResults');
-  document.getElementById('searchPager').innerHTML='';
-  meta.textContent='載入 '+name+' 的標案…'; list.innerHTML='';
+
+/* ---------- 機關採購輪廓（全期間，直接打 listbyunit） ---------- */
+let unitData=null, unitPeriod=5, unitSort='count', unitVendorQ='', fillAbort=false, currentVendor=null;
+
+function recDate(r){ const s=String(r.date||''); if(s.length!==8) return null;
+  return new Date(+s.slice(0,4),+s.slice(4,6)-1,+s.slice(6)); }
+function recTy(r){ return (r.brief&&r.brief.type)||''; }
+function isAwardRec(r){ const t=recTy(r); return t.indexOf('決標公告')>=0 && t.indexOf('無法')<0; }
+function isTenderRec(r){ const t=recTy(r); return t.indexOf('招標公告')>=0||t.indexOf('公開取得')>=0; }
+function recVendors(r){ return ((r.brief&&r.brief.companies&&r.brief.companies.names)||[]).map(n=>String(n||'').trim()).filter(Boolean); }
+function vendorShort(n){ return String(n||'').replace(/\s*[（(][^）)]*[）)]\s*$/,''); }
+function amtKey(job){ return unitData.unit_id+'|'+job; }
+function amtOf(job){ const c=amountCache[amtKey(job)]; return (c&&c.a)||0; }
+function fmtWan(n){ if(!n) return '—';
+  if(n>=1e8) return (n/1e8).toFixed(2).replace(/\.?0+$/,'')+' 億';
+  if(n>=1e4) return Math.round(n/1e4).toLocaleString()+' 萬';
+  return n.toLocaleString()+' 元'; }
+
+async function openAgency(unit_id,unit_name){
+  go('agencies');
+  const box=document.getElementById('agencyDetail');
+  box.classList.remove('hidden');
+  const say=t=>box.innerHTML='<div class="card p-8 text-center text-sm text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>'+t+'</div>';
+  say('抓取 '+esc(unit_name||unit_id)+' 的公告…');
+  window.scrollTo(0,0);
   try{
-    const r=await api('/api/listbyunit?unit_id='+encodeURIComponent(unit_id));
-    const recs=r.records||[];
-    meta.textContent=name+'：共 '+recs.length+' 則公告';
-    recs.slice(0,100).forEach(x=>list.appendChild(tenderCard({...x,unit_name:x.unit_name||name})));
-  }catch(e){ meta.textContent=''; list.innerHTML='<div class="card p-6 text-sm text-rose-600">載入失敗：'+esc(e.message)+'</div>'; }
+    let page=1,all=[],name=unit_name||'',tp=1;
+    while(page<=25){
+      const r=await api('/api/listbyunit?unit_id='+encodeURIComponent(unit_id)+'&page='+page);
+      name=r.unit_name||name;
+      tp=r.total_page||r.total_pages||1;
+      const recs=r.records||[];
+      all=all.concat(recs);
+      say('抓取 '+esc(name)+'：第 '+page+' / '+tp+' 頁，已取得 '+fmtNum(all.length)+' 則…');
+      if(page>=tp||!recs.length) break;
+      page++; await new Promise(s=>setTimeout(s,300));
+    }
+    unitData={unit_id,unit_name:name,records:all};
+    unitVendorQ=''; unitSort='count';
+    renderAgencyDetail();
+  }catch(e){ box.innerHTML='<div class="card p-6 text-sm text-rose-600">載入失敗：'+esc(e.message)+'</div>'; }
+}
+function closeAgency(){ unitData=null; document.getElementById('agencyDetail').classList.add('hidden'); }
+function setUnitPeriod(y){ unitPeriod=y; renderAgencyDetail(); }
+function setUnitSort(s){ unitSort=s; renderAgencyDetail(); }
+function onVendorQ(v){ unitVendorQ=(v||'').trim(); renderVendorRank(); }
+
+function unitPeriodRecords(){
+  if(!unitData) return [];
+  if(!unitPeriod) return unitData.records;
+  const cut=new Date(); cut.setFullYear(cut.getFullYear()-unitPeriod);
+  return unitData.records.filter(r=>{ const d=recDate(r); return d&&d>=cut; });
+}
+function vendorStats(recs){
+  const map={};
+  recs.forEach(r=>{
+    if(!isAwardRec(r)) return;
+    const seen={};
+    recVendors(r).forEach(n=>{
+      if(seen[n]) return; seen[n]=1;
+      const m=map[n]||(map[n]={name:n,count:0,amount:0,known:0,multi:0,cases:[]});
+      m.count++; m.cases.push(r);
+      const a=amtOf(r.job_number);
+      if(a){ m.amount+=a; m.known++; if(recVendors(r).length>1) m.multi++; }
+    });
+  });
+  return Object.values(map);
+}
+
+function renderAgencyDetail(){
+  if(!unitData){ document.getElementById('agencyDetail').classList.add('hidden'); return; }
+  const per=unitPeriodRecords();
+  const awards=per.filter(isAwardRec), tenders=per.filter(isTenderRec);
+  const known=awards.filter(r=>amtOf(r.job_number));
+  const sum=known.reduce((a,r)=>a+amtOf(r.job_number),0);
+  const need=awards.length-known.length;
+  const vs=vendorStats(per);
+  const dates=unitData.records.map(recDate).filter(Boolean).sort((a,b)=>a-b);
+  const span=dates.length?(dates[0].toISOString().slice(0,10)+' — '+dates[dates.length-1].toISOString().slice(0,10)):'—';
+  const pill=(y,l)=>'<button onclick="setUnitPeriod('+y+')" class="px-3 py-1.5 text-xs rounded-lg '+(unitPeriod===y?'bg-jade-600 text-white font-semibold':'bg-white border hover:bg-slate-50')+'">'+l+'</button>';
+
+  document.getElementById('agencyDetail').innerHTML=
+  '<div class="rounded-2xl bg-ink-900 text-white p-5">'+
+    '<div class="flex justify-between items-start gap-3">'+
+      '<div class="min-w-0"><div class="eyebrow text-jade-500/90">AGENCY PROFILE</div>'+
+      '<h3 class="text-lg font-bold mt-1 leading-snug"><i class="fa-solid fa-building-columns mr-2 text-jade-400"></i>'+esc(unitData.unit_name)+'</h3>'+
+      '<div class="text-[11px] text-white/40 mt-1 font-mono">'+esc(unitData.unit_id)+' · 收錄 '+span+'</div></div>'+
+      '<button onclick="closeAgency()" class="text-white/50 hover:text-white p-1 flex-shrink-0"><i class="fa-solid fa-xmark text-lg"></i></button>'+
+    '</div>'+
+    '<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5">'+
+      '<div><div class="text-2xl font-bold">'+fmtNum(unitData.records.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">全期間公告</div></div>'+
+      '<div><div class="text-2xl font-bold">'+fmtNum(awards.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">決標紀錄（'+(unitPeriod?('近'+unitPeriod+'年'):'全期')+'）</div></div>'+
+      '<div><div class="text-2xl font-bold">'+fmtNum(tenders.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">招標公告（同期）</div></div>'+
+      '<div><div class="text-2xl font-bold">'+fmtNum(vs.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">得標廠商家數</div></div>'+
+    '</div>'+
+    '<div class="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">'+
+      '<span class="text-white/50">已補齊決標金額合計</span><span class="text-lg font-bold text-jade-300">'+fmtWan(sum)+'</span>'+
+      '<span class="text-white/40">'+known.length+' / '+awards.length+' 案有金額'+(need?('，'+need+' 案未補'):'')+'</span>'+
+      '<button onclick="listUnitRecords()" class="ml-auto px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs">在情報中心列出全部公告</button>'+
+    '</div>'+
+  '</div>'+
+
+  '<div class="grid lg:grid-cols-3 gap-4">'+
+    '<div class="lg:col-span-2 card p-5">'+
+      '<div class="flex justify-between items-start flex-wrap gap-2">'+
+        '<div><div class="eyebrow">AGENCY VENDORS</div><h3 class="font-bold text-ink-900 mt-1">得標廠商排行</h3></div>'+
+        '<div class="flex gap-1.5">'+pill(3,'3 年')+pill(5,'5 年')+pill(10,'10 年')+pill(0,'全部')+'</div>'+
+      '</div>'+
+      '<div class="flex flex-wrap gap-2 mt-3">'+
+        '<input id="vendorQ" type="text" value="'+esc(unitVendorQ)+'" oninput="onVendorQ(this.value)" placeholder="搜尋此機關得標廠商…" class="flex-1 min-w-[180px] px-3 py-2 border rounded-xl text-sm">'+
+        '<button onclick="setUnitSort(\'count\')" class="px-3 py-2 text-xs rounded-lg '+(unitSort==='count'?'bg-ink-800 text-white':'border bg-white')+'">依件數</button>'+
+        '<button onclick="setUnitSort(\'amount\')" class="px-3 py-2 text-xs rounded-lg '+(unitSort==='amount'?'bg-ink-800 text-white':'border bg-white')+'">依金額</button>'+
+      '</div>'+
+      (need?('<div class="mt-3 flex items-center gap-2 flex-wrap text-xs bg-amber-50 border border-amber-100 rounded-xl p-3">'+
+        '<i class="fa-solid fa-coins text-amber-600"></i><span class="text-amber-800">還有 <strong>'+need+'</strong> 案沒有決標金額（公告清單不含金額，要逐案抓）。</span>'+
+        '<button onclick="fillAgencyAmounts()" class="ml-auto px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium">補齊決標金額</button></div>')
+       :(awards.length?'<div class="mt-3 text-xs text-jade-700 bg-jade-50 border border-jade-100 rounded-xl p-3"><i class="fa-solid fa-circle-check mr-1"></i>本期間決標金額已全部補齊。</div>':''))+
+      '<div id="fillProgress" class="hidden mt-3 text-xs bg-slate-50 border rounded-xl p-3"></div>'+
+      '<div id="vendorRank" class="mt-3"></div>'+
+      '<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">金額為公告的「總決標金額」。複數決標／共同投標的案子，官方只公布一個總額，這裡會同時計入每一家得標廠商，看到 <span class="tag bg-slate-100 text-slate-600">共同</span> 標記代表該筆有重複計算風險。</p>'+
+    '</div>'+
+
+    '<div class="card p-5">'+
+      '<div class="eyebrow">PROFILE</div><h3 class="font-bold text-ink-900 mt-1">採購輪廓</h3>'+
+      '<div class="text-[11px] text-slate-400 mt-0.5">全期間收錄</div>'+
+      distBlock('公告類型', tally(unitData.records, r=>recTy(r)||'未分類'), 7)+
+      distBlock('年度公告量', yearTally(unitData.records), 10)+
+    '</div>'+
+  '</div>';
+
+  renderVendorRank();
+}
+function tally(recs,fn){ const m={}; recs.forEach(r=>{ const k=fn(r); if(!k) return; m[k]=(m[k]||0)+1; });
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]); }
+function yearTally(recs){ const m={}; recs.forEach(r=>{ const d=recDate(r); if(!d) return; const y=d.getFullYear(); m[y]=(m[y]||0)+1; });
+  return Object.entries(m).sort((a,b)=>b[0]-a[0]).slice(0,10); }
+function distBlock(title,rows,limit){
+  if(!rows.length) return '';
+  const top=rows.slice(0,limit), max=Math.max.apply(null,top.map(r=>r[1]))||1;
+  let h='<div class="mt-4"><div class="text-xs font-semibold text-slate-600 mb-2">'+esc(title)+'</div>';
+  top.forEach(([k,v])=>{ h+='<div class="mb-2"><div class="flex justify-between text-[11px]"><span class="text-slate-600 truncate pr-2">'+esc(k)+'</span><span class="font-bold text-ink-900">'+fmtNum(v)+'</span></div>'+
+    '<div class="h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden"><div class="h-full bg-jade-500 rounded-full" style="width:'+(v/max*100)+'%"></div></div></div>'; });
+  return h+'</div>';
+}
+function renderVendorRank(){
+  const box=document.getElementById('vendorRank'); if(!box) return;
+  let vs=vendorStats(unitPeriodRecords());
+  if(unitVendorQ) vs=vs.filter(v=>v.name.indexOf(unitVendorQ)>=0);
+  vs.sort((a,b)=> unitSort==='amount' ? (b.amount-a.amount)||(b.count-a.count) : (b.count-a.count)||(b.amount-a.amount));
+  if(!vs.length){ box.innerHTML='<p class="text-xs text-slate-400 py-6 text-center">'+(unitVendorQ?'沒有符合的廠商。':'這個期間沒有決標紀錄。')+'</p>'; return; }
+  const show=vs.slice(0,50);
+  let h='<div class="flex text-[11px] text-slate-400 px-2 pb-2 border-b"><span class="w-8">排名</span><span class="flex-1">廠商</span><span class="w-16 text-right">件數</span><span class="w-24 text-right">決標金額</span><span class="w-4"></span></div>';
+  show.forEach((v,i)=>{
+    h+='<div onclick="openVendorCases('+JSON.stringify(v.name).replace(/"/g,'&quot;')+')" class="flex items-center px-2 py-2.5 border-b last:border-0 cursor-pointer hover:bg-slate-50 text-sm">'+
+      '<span class="w-8 text-xs font-mono text-slate-400">'+String(i+1).padStart(2,'0')+'</span>'+
+      '<span class="flex-1 min-w-0 truncate pr-2 text-ink-900">'+esc(vendorShort(v.name))+(v.multi?' <span class="tag bg-slate-100 text-slate-600">共同</span>':'')+'</span>'+
+      '<span class="w-16 text-right font-semibold">'+v.count+' 件</span>'+
+      '<span class="w-24 text-right font-semibold text-jade-700">'+(v.known?fmtWan(v.amount):'<span class="text-slate-300">未補齊</span>')+'</span>'+
+      '<i class="fa-solid fa-chevron-right text-slate-300 w-4 text-right text-xs"></i></div>';
+  });
+  if(vs.length>show.length) h+='<div class="text-[11px] text-slate-400 text-center pt-3">另有 '+(vs.length-show.length)+' 家未顯示，用上面的搜尋框縮小範圍。</div>';
+  box.innerHTML=h;
+}
+function listUnitRecords(){
+  if(!unitData) return;
+  go('tenders');
+  document.getElementById('searchMeta').textContent=unitData.unit_name+'：全期間共 '+fmtNum(unitData.records.length)+' 則公告（顯示前 200 則）';
+  const list=document.getElementById('searchResults'); list.innerHTML=''; document.getElementById('searchPager').innerHTML='';
+  unitData.records.slice(0,200).forEach(x=>list.appendChild(tenderCard({...x,unit_name:x.unit_name||unitData.unit_name})));
+}
+
+/* ---------- 決標金額補齊 ---------- */
+async function fetchAmount(job_number){
+  const r=await api('/api/tender?unit_id='+encodeURIComponent(unitData.unit_id)+'&job_number='+encodeURIComponent(job_number));
+  const recs=r.records||[];
+  const aw=recs.filter(x=>{const t=(x.brief&&x.brief.type)||''; return t.indexOf('決標公告')>=0&&t.indexOf('無法')<0;});
+  const rec=aw.length?aw[aw.length-1]:recs[recs.length-1];
+  const d=(rec&&rec.detail)||{};
+  return { a: parseMoney(pick(d,['總決標金額']))||parseMoney(pick(d,['決標金額']))||0,
+           d: pick(d,['決標日期'])||'', b: parseMoney(pick(d,['預算金額']))||0 };
+}
+async function fillAmounts(jobs,onTick){
+  const todo=jobs.filter(j=>!amountCache[amtKey(j)]);
+  if(!todo.length){ toast('這些案子都已經有金額了','info'); return 0; }
+  fillAbort=false; let done=0,fail=0;
+  for(const j of todo){
+    if(fillAbort) break;
+    try{ amountCache[amtKey(j)]=await fetchAmount(j); }
+    catch(e){ fail++; amountCache[amtKey(j)]={a:0,d:'',b:0,err:1}; }
+    done++; if(onTick) onTick(done,todo.length,fail);
+    await new Promise(s=>setTimeout(s,320));
+  }
+  LS.set(K.AMOUNT,amountCache);
+  return done;
+}
+async function fillAgencyAmounts(){
+  const jobs=unitPeriodRecords().filter(isAwardRec).map(r=>r.job_number);
+  const uniq=jobs.filter((j,i)=>jobs.indexOf(j)===i);
+  const need=uniq.filter(j=>!amountCache[amtKey(j)]).length;
+  if(!need){ toast('本期間已全部補齊','info'); return; }
+  const mins=Math.ceil(need*0.35/60);
+  if(!confirm('要逐案向 API 取 '+need+' 筆決標金額，約需 '+mins+' 分鐘（每 0.32 秒一次，避免打太兇）。\n中途可以按取消。要開始嗎？')) return;
+  const bar=document.getElementById('fillProgress');
+  bar.classList.remove('hidden');
+  const paint=(d,t,f)=>{ bar.innerHTML='<div class="flex items-center gap-3"><span class="flex-1">補齊中… <strong>'+d+'</strong> / '+t+(f?('（'+f+' 筆失敗）'):'')+'</span>'+
+    '<button onclick="fillAbort=true" class="px-3 py-1 rounded-lg border bg-white text-xs">取消</button></div>'+
+    '<div class="h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden"><div class="h-full bg-jade-500 rounded-full" style="width:'+(d/t*100)+'%"></div></div>'; };
+  paint(0,need,0);
+  const n=await fillAmounts(uniq,paint);
+  bar.classList.add('hidden');
+  toast(fillAbort?('已停止，補了 '+n+' 筆'):('完成，補了 '+n+' 筆'), fillAbort?'warning':'success');
+  renderAgencyDetail();
+}
+
+/* ---------- 廠商 × 機關 得標案件 ---------- */
+function openVendorCases(name){
+  if(!unitData) return;
+  const recs=unitPeriodRecords().filter(isAwardRec).filter(r=>recVendors(r).indexOf(name)>=0);
+  currentVendor={name,recs};
+  renderVendorModal();
+  modal('vendorModal',true);
+}
+function renderVendorModal(){
+  if(!currentVendor) return;
+  const {name,recs}=currentVendor;
+  const known=recs.filter(r=>amtOf(r.job_number));
+  const sum=known.reduce((a,r)=>a+amtOf(r.job_number),0);
+  const need=recs.length-known.length;
+  document.getElementById('vmTitle').innerHTML=esc(vendorShort(name))+' <span class="text-slate-400 font-normal">在</span> '+esc(unitData.unit_name);
+  document.getElementById('vmStats').innerHTML=
+    '<div class="p-3"><div class="text-[11px] text-slate-500">得標案件</div><div class="text-base font-bold text-ink-900 mt-0.5">'+recs.length+' 件</div></div>'+
+    '<div class="p-3"><div class="text-[11px] text-slate-500">公開決標金額合計</div><div class="text-base font-bold text-jade-700 mt-0.5">'+fmtWan(sum)+'</div></div>'+
+    '<div class="p-3"><div class="text-[11px] text-slate-500">金額有揭露</div><div class="text-base font-bold text-ink-900 mt-0.5">'+known.length+' / '+recs.length+' 件</div></div>'+
+    '<div class="p-3"><div class="text-[11px] text-slate-500">統計期間</div><div class="text-base font-bold text-ink-900 mt-0.5">'+(unitPeriod?('近 '+unitPeriod+' 年'):'全期間')+'</div></div>';
+  const body=document.getElementById('vmBody');
+  body.innerHTML='';
+  recs.slice().sort((a,b)=>(b.date||0)-(a.date||0)).forEach(r=>{
+    const c=amountCache[amtKey(r.job_number)];
+    const el=document.createElement('div');
+    el.className='border rounded-xl p-3 cursor-pointer hover:bg-slate-50 flex items-center gap-3';
+    el.onclick=()=>{ modal('vendorModal',false); openTender(unitData.unit_id,r.job_number,unitData.unit_name,(r.brief&&r.brief.title)||''); };
+    const ds=String(r.date||''); const dstr=ds.length===8?(ds.slice(0,4)+'/'+ds.slice(4,6)+'/'+ds.slice(6)):'';
+    el.innerHTML='<div class="min-w-0 flex-1">'+
+      '<div class="text-sm font-semibold text-ink-900 leading-snug">'+esc((r.brief&&r.brief.title)||'（無標案名稱）')+'</div>'+
+      '<div class="text-[11px] text-slate-500 mt-1">案號 <span class="font-mono">'+esc(r.job_number)+'</span> · 公告 '+dstr+
+      (c?(c.d?' · 決標 '+esc(c.d):''):'')+' · 決標金額 '+(c?(c.a?('<strong class="text-jade-700">'+fmtWan(c.a)+'</strong>'):'<span class="text-slate-400">未公開</span>'):'<span class="text-slate-300">未補齊</span>')+
+      (recVendors(r).length>1?' · <span class="tag bg-slate-100 text-slate-600">共 '+recVendors(r).length+' 家得標</span>':'')+'</div></div>'+
+      '<i class="fa-solid fa-chevron-right text-slate-300"></i>';
+    body.appendChild(el);
+  });
+  document.getElementById('vmFoot').innerHTML = need
+    ? '<span class="text-xs text-slate-500 flex-1">'+need+' 案還沒有金額。</span><button onclick="fillVendorAmounts()" class="px-3 py-2 text-xs bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium"><i class="fa-solid fa-coins mr-1"></i>補齊這 '+need+' 案</button>'
+    : '<span class="text-xs text-jade-700"><i class="fa-solid fa-circle-check mr-1"></i>金額都已補齊。</span>';
+}
+async function fillVendorAmounts(){
+  if(!currentVendor) return;
+  const jobs=currentVendor.recs.map(r=>r.job_number).filter((j,i,a)=>a.indexOf(j)===i);
+  const foot=document.getElementById('vmFoot');
+  const paint=(d,t,f)=>{ foot.innerHTML='<span class="text-xs flex-1">補齊中… <strong>'+d+'</strong> / '+t+(f?('（'+f+' 失敗）'):'')+'</span><button onclick="fillAbort=true" class="px-3 py-2 text-xs border rounded-lg bg-white">取消</button>'; };
+  paint(0,jobs.filter(j=>!amountCache[amtKey(j)]).length,0);
+  await fillAmounts(jobs,paint);
+  renderVendorModal(); renderAgencyDetail();
 }
 
 /* ================= 市場與廠商 ================= */
@@ -1300,521 +1291,36 @@ function renderCompare(){
 }
 function removeCompare(i){ compareList.splice(i,1); LS.set(K.COMPARE,compareList); renderCompare(); updateCounters(); }
 
-/* ================= AI：模型 ================= */
-function getApiKey(){ return (LS.get(K.KEY,'')||'').trim(); }
-function getModel(){ const m=LS.get(K.MODEL,'gemini-3-flash-preview'); return m==='__custom__'?(LS.get(K.CUSTOM_MODEL,'')||'gemini-3-flash-preview'):m; }
-function getBudget(){ return parseInt(LS.get(K.BUDGET,60000),10)||60000; }
-
-async function callGemini(prompt,system,signal){
-  const key=getApiKey(); const model=getModel();
-  if(!key) throw new Error('尚未設定 Gemini API Key（右上角設定）');
-  const retriable=s=>[429,500,502,503,504].indexOf(s)>=0;
-  const delays=[1500,3000,6000,12000];
-  async function classic(){
-    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent',
-      {method:'POST',signal,headers:{'Content-Type':'application/json','x-goog-api-key':key},
-       body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],systemInstruction:{parts:[{text:system}]}})});
-    if(!r.ok){ let m='HTTP '+r.status; try{const j=await r.json(); m=(j.error&&j.error.message)||m;}catch(e){}
-      const e=new Error(m); e.status=r.status; throw e; }
-    const data=await r.json();
-    const parts=data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts;
-    const text=parts?parts.map(p=>p.text||'').join(''):'';
-    if(!text.trim()) throw new Error('模型沒有回傳文字');
-    return text;
-  }
-  async function interactions(){
-    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',
-      {method:'POST',signal,headers:{'Content-Type':'application/json','x-goog-api-key':key,'Api-Revision':'2026-05-20'},
-       body:JSON.stringify({model,input:prompt,system_instruction:system})});
-    if(!r.ok){ let m='HTTP '+r.status; try{const j=await r.json(); m=(j.error&&j.error.message)||m;}catch(e){}
-      const e=new Error(m); e.status=r.status; throw e; }
-    const data=await r.json();
-    let text=data.output_text||'';
-    if(!text&&Array.isArray(data.steps)){ const last=data.steps[data.steps.length-1]; text=((last&&last.content)||[]).map(c=>c.text||'').join(''); }
-    if(!text.trim()) throw new Error('模型沒有回傳文字');
-    return text;
-  }
-  let lastErr=null;
-  for(let i=0;i<=delays.length;i++){
-    try{ return await classic(); }
-    catch(err){
-      if(err.name==='AbortError') throw err;
-      lastErr=err;
-      if(err.status===404||err.status===400){
-        try{ return await interactions(); }
-        catch(e2){ if(e2.name==='AbortError') throw e2; lastErr=e2; if(!retriable(e2.status)) throw e2; }
-      } else if(!retriable(err.status)) throw err;
-      if(i<delays.length) await new Promise(r=>setTimeout(r,delays[i]));
-    }
-  }
-  throw lastErr||new Error('呼叫失敗');
-}
-
-/* ================= AI：檔案 ================= */
-const dropZone=document.getElementById('dropZone'), fileInput=document.getElementById('fileInput');
-dropZone.addEventListener('click',()=>fileInput.click());
-dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('border-jade-500','bg-jade-50/40');});
-dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('border-jade-500','bg-jade-50/40'));
-dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('border-jade-500','bg-jade-50/40');handleFiles(e.dataTransfer.files);});
-fileInput.addEventListener('change',e=>handleFiles(e.target.files));
-
-async function handleFiles(files){
-  if(!files||!files.length) return;
-  toast('正在解析 '+files.length+' 個檔案…','info');
-  for(const f of files) await processFile(f);
-  renderFileTable(); persistDocs(); fileInput.value='';
-}
-async function processFile(file){
-  const ext=file.name.split('.').pop().toLowerCase();
-  try{
-    if(ext==='zip'){
-      const zip=await JSZip.loadAsync(file);
-      for(const p in zip.files){ const en=zip.files[p]; if(en.dir) continue;
-        const sub=en.name.split('.').pop().toLowerCase();
-        if(['pdf','docx','xlsx','xls','ods','csv','txt','md'].indexOf(sub)>=0){
-          const blob=await en.async('blob'); await parseFile(new File([blob],en.name),'['+file.name+'] '+en.name); } }
-    } else await parseFile(file,file.name);
-  }catch(err){ toast('讀取 '+file.name+' 失敗：'+err.message,'error'); }
-}
-async function parseFile(file,displayName){
-  const ext=file.name.split('.').pop().toLowerCase();
-  let text='';
-  if(ext==='pdf') text=await extractPdf(file);
-  else if(ext==='docx') text=await extractDocx(file);
-  else if(['xlsx','xls','ods','csv'].indexOf(ext)>=0) text=await extractSheet(file);
-  else if(['txt','md'].indexOf(ext)>=0) text=await file.text();
-  if(text&&text.trim()) documentVault.push({id:Date.now()+'-'+Math.random().toString(36).slice(2,7),name:displayName,ext,size:file.size,text,wordCount:text.length,selected:true});
-  else toast(displayName+' 沒抓到文字（可能是掃描影像）','warning');
-}
-async function extractPdf(file){
-  const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
-  let out='';
-  for(let i=1;i<=pdf.numPages;i++){ const p=await pdf.getPage(i); const tc=await p.getTextContent();
-    out+='\n[頁次 '+i+']\n'+tc.items.map(it=>it.str).join(' '); }
-  return out;
-}
-async function extractDocx(file){ return (await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()})).value; }
-async function extractSheet(file){
-  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
-  let out='';
-  wb.SheetNames.forEach(n=>{ const csv=XLSX.utils.sheet_to_csv(wb.Sheets[n]); if(csv.trim()) out+='\n[工作表：'+n+']\n'+csv; });
-  return out;
-}
-let docsPersisted=true;
-function persistDocs(){
-  if(!LS.set(K.DOCS,documentVault)&&docsPersisted){
-    docsPersisted=false;
-    LS.set(K.DOCS,documentVault.map(d=>({...d,text:'',truncated:true})));
-    toast('文件太大，關掉頁面後不會保留','warning');
-  }
-}
-function removeDocument(id){ documentVault=documentVault.filter(d=>d.id!==id); renderFileTable(); persistDocs(); }
-function clearAllDocuments(){ if(!documentVault.length) return; documentVault=[]; renderFileTable(); persistDocs(); toast('文件庫已清空','info'); }
-function toggleDocSelected(id,v){ const d=documentVault.find(x=>x.id===id); if(d){ d.selected=v; persistDocs(); renderFileTable(); } }
-function renderFileTable(){
-  const list=document.getElementById('fileTableList'), empty=document.getElementById('emptyFileTip');
-  document.getElementById('step1FileCount').textContent=documentVault.length;
-  document.getElementById('step1TotalWords').textContent=documentVault.filter(d=>d.selected).reduce((a,d)=>a+d.wordCount,0).toLocaleString();
-  if(!documentVault.length){ empty.classList.remove('hidden'); list.classList.add('hidden'); list.innerHTML=''; return; }
-  empty.classList.add('hidden'); list.classList.remove('hidden'); list.innerHTML='';
-  const icons={pdf:'fa-file-pdf text-rose-500',docx:'fa-file-word text-blue-500',xlsx:'fa-file-excel text-emerald-500',
-    xls:'fa-file-excel text-emerald-500',ods:'fa-file-excel text-emerald-500',csv:'fa-file-csv text-emerald-500',
-    txt:'fa-file-lines text-slate-500',md:'fa-file-code text-indigo-500'};
-  documentVault.forEach(doc=>{
-    const row=document.createElement('div');
-    row.className='flex items-center justify-between px-3 py-3 bg-white hover:bg-slate-50 text-xs gap-2';
-    row.innerHTML='<div class="flex items-center gap-2.5 min-w-0">'+
-      '<input type="checkbox" '+(doc.selected?'checked':'')+' class="rounded text-jade-600">'+
-      '<i class="fa-solid '+(icons[doc.ext]||'fa-file text-slate-400')+'"></i>'+
-      '<div class="truncate"><span class="font-medium text-slate-800">'+esc(doc.name)+'</span>'+
-      '<span class="text-[10px] text-slate-400 ml-2 font-mono">('+doc.wordCount.toLocaleString()+' 字'+(doc.truncated?' · 未保留':'')+')</span></div></div>'+
-      '<div class="flex items-center gap-1.5 flex-shrink-0">'+
-      '<button class="px-2 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 rounded">抽查</button>'+
-      '<button class="p-1 text-slate-400 hover:text-rose-600"><i class="fa-regular fa-trash-can"></i></button></div>';
-    row.querySelector('input').onchange=e=>toggleDocSelected(doc.id,e.target.checked);
-    const btns=row.querySelectorAll('button');
-    btns[0].onclick=()=>previewDoc(doc.id);
-    btns[1].onclick=()=>removeDocument(doc.id);
-    list.appendChild(row);
-  });
-}
-function previewDoc(id){
-  const doc=documentVault.find(d=>d.id===id); if(!doc) return;
-  document.getElementById('docPreviewTitle').textContent=doc.name;
-  document.getElementById('docPreviewBody').textContent=doc.text?doc.text.slice(0,20000):'（內容未保留，請重新上傳）';
-  modal('docPreviewModal',true);
-}
-function getCorpus(){
-  const picked=documentVault.filter(d=>d.selected&&d.text);
-  if(!picked.length) return '';
-  const budget=getBudget(); let out='';
-  for(const d of picked){
-    const chunk='=== 來源文件：'+d.name+' ===\n'+d.text+'\n\n';
-    if(out.length+chunk.length>budget){ out+=chunk.slice(0,Math.max(0,budget-out.length)); break; }
-    out+=chunk;
-  }
-  return out;
-}
-
-/* ================= AI：任務 ================= */
-const SYSTEM_PROMPT=`你是一位精通台灣《政府採購法》、工程會最有利標與評選作業規章的資深標案主任企劃師與評選策略顧問。
-寫作規範：
-1. 一律使用台灣繁體中文、公部門正式商務企劃語言，邏輯嚴謹、用語客觀具體，不用空泛宣傳詞。
-2. 使用標準 Markdown（# 章、## 節、### 子項、- 列點、| 表格 |、**粗體**）。
-3. 融入政府標準（資安要求、工程會履約品管、甘特圖、WBS 工作拆解、SLA 量化指標）。
-4. 資料不足時明確標示「待確認」，不要編造機關名稱、金額、法條條號或實績。`;
-const TASKS={
- analysis:{label:'需求痛點剖析',busy:'正在剖析招標需求與合規指標…',body:`請閱讀以下招標文件，產出《標案核心需求與評選重點剖析報告》：
-# 壹、標案背景與機關核心痛點
-# 貳、關鍵規格與強制驗收指標檢核清單（用表格）
-# 參、潛在履約風險與避坑建議`},
- scoring:{label:'評選配分佈局',busy:'正在拆解評選標準與配分…',body:`請剖析《評選標準配分與致勝得分策略》：
-# 壹、評選項目與權重結構（用表格逐項列出項目、配分、審查重點）
-# 貳、高配分關鍵決勝點
-# 參、我方致勝佈局與亮點提煉`},
- outline:{label:'章節大綱規劃',busy:'正在規劃章節目錄與頁數配比…',body:`請依行政院公共工程委員會的採購企劃規範，規劃完整《服務建議書章節大綱》，涵蓋專案背景與需求剖析、整體規劃與執行策略、具體工作項目與實施步驟、專案組織與履約實績、預定進度與品質管考、預期效益與 KPI，並用表格標註各章節建議頁數配比（以 50–80 頁為基準）。`},
- qa:{label:'評選攻防錦囊',busy:'正在模擬委員質詢與應答…',body:`請模擬評選簡報現場，預測委員可能提出的 5 大尖銳質疑，每題依三段式撰寫：【委員可能質疑】【委員背後的疑慮】【我方應對說詞】。`},
- draft:{label:'完整建議書底稿',busy:'正在起草完整底稿，需要較久…',body:`請起草具體充實的《服務建議書核心章節初稿》：
-# 第一章 專案背景與需求深度剖析（含需求符合性對照矩陣表格）
-# 第二章 總體架構與落地方案（含 WBS 與分階段交付物）
-# 第三章 專案管理與品質管控（含里程碑與風險矩陣）
-# 第四章 預期效益與量化指標`}
-};
-function setBusy(on,text){
-  document.getElementById('aiGeneratingBar').classList.toggle('hidden',!on);
-  if(text) document.getElementById('aiGeneratingText').textContent=text;
-  document.querySelectorAll('.ai-task-btn').forEach(b=>{ b.disabled=on; b.classList.toggle('opacity-50',on); });
-}
-function cancelAiTask(){ if(currentAbort) currentAbort.abort(); }
-function buildMeta(){
-  const g=id=>document.getElementById(id).value.trim();
-  return '【標案基本背景】\n- 標案名稱：'+(g('projectTitle')||'（依招標文件）')+
-    '\n- 招標機關：'+(g('agencyName')||'（依招標文件）')+
-    '\n- 提案廠商：'+(g('vendorName')||'（本投標團隊）')+'\n'+
-    (g('customIntent')?'- 我方核心優勢：'+g('customIntent')+'\n':'');
-}
-async function runAiTask(key){
-  const corpus=getCorpus();
-  if(!corpus){ toast('請先在 Step 1 上傳並勾選文件，或從標案詳情送公告進來','warning'); switchStep(1); return; }
-  let body,label,busy;
-  if(key==='custom'){
-    body=document.getElementById('customPromptInput').value.trim();
-    if(!body){ toast('請先寫下自訂指令','warning'); return; }
-    label='自訂指令'; busy='正在依你的指令處理…'; LS.set(K.CUSTOM_PROMPT,body);
-  } else { const t=TASKS[key]; body=t.body; label=t.label; busy=t.busy; }
-  await execute(buildMeta()+'\n'+body+'\n\n文件內容：\n'+corpus,label,busy);
-}
-async function runFollowUp(){
-  const instr=document.getElementById('followUpInput').value.trim();
-  const cur=getActiveOutput();
-  if(!cur){ toast('目前沒有稿件','warning'); return; }
-  if(!instr){ toast('請先寫下要改什麼','warning'); return; }
-  await execute(buildMeta()+'\n以下是現有稿件，請依指示改寫並輸出完整新版全文。\n\n【改寫指示】\n'+instr+'\n\n【現有稿件】\n'+cur.content,
-    cur.label+'（改寫）','正在依指示改寫…');
-  document.getElementById('followUpInput').value='';
-}
-async function execute(prompt,label,busy){
-  currentAbort=new AbortController(); setBusy(true,busy);
-  try{
-    const text=await callGemini(prompt,SYSTEM_PROMPT,currentAbort.signal);
-    addOutput(label,text); switchStep(4); toast('「'+label+'」完成','success');
-  }catch(err){
-    if(err.name==='AbortError') toast('已中止','info'); else toast('產製失敗：'+err.message,'error');
-  }finally{ setBusy(false); currentAbort=null; }
-}
-
-/* ================= AI：稿件 ================= */
-function addOutput(label,content){
-  const o={id:Date.now()+'-'+Math.random().toString(36).slice(2,6),label,content,createdAt:new Date().toISOString()};
-  outputs.unshift(o); activeOutputId=o.id; persistOutputs(); renderOutputTabs(); renderDraft();
-}
-function persistOutputs(){ LS.set(K.OUTPUTS,outputs); LS.set(K.ACTIVE,activeOutputId); }
-function getActiveOutput(){ return outputs.find(o=>o.id===activeOutputId)||null; }
-function selectOutput(id){ activeOutputId=id; persistOutputs(); renderOutputTabs(); renderDraft(); }
-function deleteOutput(id,ev){ if(ev) ev.stopPropagation();
-  outputs=outputs.filter(o=>o.id!==id);
-  if(activeOutputId===id) activeOutputId=outputs.length?outputs[0].id:null;
-  persistOutputs(); renderOutputTabs(); renderDraft(); }
-function renderOutputTabs(){
-  const bar=document.getElementById('outputTabsBar'); bar.innerHTML='';
-  outputs.forEach(o=>{
-    const active=o.id===activeOutputId;
-    const b=document.createElement('button');
-    b.onclick=()=>selectOutput(o.id);
-    b.className='group flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] border whitespace-nowrap '+
-      (active?'bg-jade-600 text-white border-jade-600':'bg-white text-slate-600 hover:bg-slate-50');
-    const d=new Date(o.createdAt);
-    const st=String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-    b.innerHTML='<span>'+esc(o.label)+'</span><span class="'+(active?'text-white/60':'text-slate-400')+' font-mono">'+st+'</span><i class="fa-solid fa-xmark opacity-60"></i>';
-    b.querySelector('i').onclick=e=>deleteOutput(o.id,e);
-    bar.appendChild(b);
-  });
-}
-function renderDraft(){
-  const cur=getActiveOutput(), content=cur?cur.content:'';
-  document.getElementById('paneEditor').value=content;
-  document.getElementById('draftCharacterCount').textContent=content.length.toLocaleString();
-  document.getElementById('followUpBar').classList.toggle('hidden',!cur);
-  const p=document.getElementById('panePreview');
-  if(!content){ p.innerHTML='<div class="h-full flex flex-col items-center justify-center text-slate-400 py-20 text-center">'+
-    '<i class="fa-solid fa-file-contract text-4xl mb-3 text-slate-300"></i><p class="text-sm">還沒有稿件</p>'+
-    '<p class="text-xs mt-1">回到 Step 3 執行任一模組。</p></div>'; return; }
-  p.innerHTML=DOMPurify.sanitize(marked.parse(content));
-}
-function handleEditorChange(){
-  const cur=getActiveOutput(); if(!cur) return;
-  cur.content=document.getElementById('paneEditor').value;
-  document.getElementById('panePreview').innerHTML=DOMPurify.sanitize(marked.parse(cur.content));
-  document.getElementById('draftCharacterCount').textContent=cur.content.length.toLocaleString();
-  clearTimeout(window.__ds); window.__ds=setTimeout(persistOutputs,600);
-}
-function setDraftViewTab(tab){
-  const panes={preview:'panePreview',editor:'paneEditor',checklist:'paneChecklist'};
-  const btns={preview:'viewTabPreview',editor:'viewTabEditor',checklist:'viewTabChecklist'};
-  Object.values(panes).forEach(id=>document.getElementById(id).classList.add('hidden'));
-  Object.values(btns).forEach(id=>document.getElementById(id).className='px-3 py-1 rounded text-slate-600 font-medium');
-  document.getElementById(panes[tab]).classList.remove('hidden');
-  document.getElementById(btns[tab]).className='px-3 py-1 rounded bg-white shadow-sm font-semibold text-slate-800';
-  document.getElementById('outputTabsBar').classList.toggle('hidden',tab==='checklist');
-  document.getElementById('followUpBar').classList.toggle('hidden',tab==='checklist'||!getActiveOutput());
-}
-function switchStep(n){
-  for(let i=1;i<=4;i++){
-    document.getElementById('stepSection'+i).classList.toggle('hidden',i!==n);
-    document.getElementById('stepTabBtn'+i).className='px-4 py-3 text-xs whitespace-nowrap border-b-2 '+
-      (i===n?'font-semibold border-jade-600 text-jade-700':'font-medium border-transparent text-slate-500');
-  }
-  updateSettingSummary();
-  if(n===4) renderChecklist();
-}
-
-/* ================= 檢核表／範本 ================= */
-function renderChecklist(){
-  const c=document.getElementById('checklistItemsContainer'); c.innerHTML='';
-  checklist.forEach((item,i)=>{
-    const el=document.createElement('label');
-    el.className='flex items-start gap-2.5 p-3 rounded-xl border hover:bg-slate-50 cursor-pointer';
-    el.innerHTML='<input type="checkbox" '+(item.checked?'checked':'')+' class="mt-0.5 rounded text-jade-600">'+
-      '<span class="flex-1 '+(item.checked?'line-through text-slate-400':'text-slate-700 font-medium')+'">'+esc(item.text)+'</span>'+
-      '<button class="text-slate-300 hover:text-rose-500"><i class="fa-regular fa-trash-can"></i></button>';
-    el.querySelector('input').onchange=e=>{ checklist[i].checked=e.target.checked; LS.set(K.CHECKLIST,checklist); renderChecklist(); };
-    el.querySelector('button').onclick=e=>{ e.preventDefault(); checklist.splice(i,1); LS.set(K.CHECKLIST,checklist); renderChecklist(); };
-    c.appendChild(el);
-  });
-}
-function addChecklistItem(){
-  const i=document.getElementById('newChecklistInput'), v=i.value.trim();
-  if(!v) return; checklist.push({text:v,checked:false}); i.value=''; LS.set(K.CHECKLIST,checklist); renderChecklist();
-}
-function renderTemplates(){
-  const s=document.getElementById('promptTemplateSelect');
-  s.innerHTML='<option value="">— 載入指令 —</option>';
-  promptTemplates.forEach((t,i)=>{ const o=document.createElement('option'); o.value=String(i); o.textContent=t.name; s.appendChild(o); });
-}
-function loadPromptTemplate(){ const s=document.getElementById('promptTemplateSelect'); if(s.value==='') return;
-  document.getElementById('customPromptInput').value=promptTemplates[+s.value].body; }
-function savePromptTemplate(){
-  const body=document.getElementById('customPromptInput').value.trim();
-  if(!body){ toast('指令是空的','warning'); return; }
-  const name=prompt('這組指令要叫什麼名字？','未命名指令'); if(!name) return;
-  promptTemplates.push({name,body}); LS.set(K.TEMPLATES,promptTemplates); renderTemplates(); toast('已存範本','success');
-}
-function deletePromptTemplate(){
-  const s=document.getElementById('promptTemplateSelect');
-  if(s.value===''){ toast('請先選一個範本','warning'); return; }
-  promptTemplates.splice(+s.value,1); LS.set(K.TEMPLATES,promptTemplates); renderTemplates(); toast('已刪除','info');
-}
-
-/* ================= 設定持久化 ================= */
-function saveSettings(){
-  const s={}; SETTING_FIELDS.forEach(id=>s[id]=document.getElementById(id).value);
-  CHECK_FIELDS.forEach(id=>s[id]=document.getElementById(id).checked);
-  LS.set(K.SETTINGS,s); updateSettingSummary();
-}
-function loadSettings(){
-  const s=LS.get(K.SETTINGS,null);
-  if(s){ SETTING_FIELDS.forEach(id=>{ if(s[id]!==undefined) document.getElementById(id).value=s[id]; });
-         CHECK_FIELDS.forEach(id=>{ if(s[id]!==undefined) document.getElementById(id).checked=s[id]; }); }
-  updateSettingSummary();
-}
-function updateSettingSummary(){
-  const fm={'Microsoft JhengHei':'微軟正黑體','DFKai-SB':'標楷體','PMingLiU':'新細明體','Noto Sans TC':'思源黑體','Noto Serif TC':'思源宋體'};
-  const lm={'240':'1.0 倍','280':'1.2 倍','360':'1.5 倍','420':'1.75 倍'};
-  const f=document.getElementById('docFontChinese').value, l=document.getElementById('docLineSpacing').value;
-  document.getElementById('currentSettingSummary').textContent=(fm[f]||f)+' · '+(lm[l]||l)+'行高';
-}
-
-/* ================= 複製／下載 ================= */
-function copyCurrentDraft(){
-  const cur=getActiveOutput(); if(!cur){ toast('沒有稿件','warning'); return; }
-  const ta=document.createElement('textarea'); ta.value=cur.content; document.body.appendChild(ta); ta.select();
-  try{ document.execCommand('copy'); toast('已複製','success'); }catch(e){ toast('複製失敗','error'); }
-  document.body.removeChild(ta);
-}
 function dl(blob,name){ const u=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=u; a.download=name;
   document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(u),1000); }
-function downloadDraftMarkdown(){
-  const cur=getActiveOutput(); if(!cur){ toast('沒有稿件','warning'); return; }
-  const t=document.getElementById('projectTitle').value.trim()||'建議書草稿';
-  dl(new Blob([cur.content],{type:'text/markdown;charset=utf-8'}),t+'_'+cur.label+'.md');
-}
-
-/* ================= Word 匯出 ================= */
-function inlineRuns(text,o){
-  const clean=String(text).replace(/`([^`]+)`/g,'$1').replace(/\[([^\]]+)\]\(([^)]+)\)/g,'$1（$2）');
-  const parts=clean.split(/(\*\*[^*]+\*\*)/g).filter(s=>s!=='');
-  const {TextRun}=window.docx;
-  if(!parts.length) return [new TextRun({text:'',font:o.font,size:o.size})];
-  return parts.map(p=>{ const b=/^\*\*[^*]+\*\*$/.test(p);
-    return new TextRun({text:b?p.slice(2,-2):p,bold:b||o.bold,font:o.font,size:o.size,color:o.color}); });
-}
-const isRow=l=>/^\s*\|.*\|\s*$/.test(l);
-const isDiv=l=>/^\s*\|[\s:\-|]+\|\s*$/.test(l);
-const splitRow=l=>l.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(c=>c.trim());
-
-async function exportWordDocx(){
-  const cur=getActiveOutput();
-  if(!cur||!cur.content.trim()){ toast('沒有稿件可匯出','warning'); return; }
-  if(!window.docx){ toast('Word 模組尚未載入','error'); return; }
-  try{
-    toast('正在產製 Word…','info');
-    const {Document,Paragraph,TextRun,HeadingLevel,AlignmentType,Packer,Footer,PageNumber,
-           Table,TableRow,TableCell,WidthType,BorderStyle,TableOfContents,LevelFormat}=window.docx;
-    const g=id=>document.getElementById(id).value;
-    const fontCn=g('docFontChinese'), line=parseInt(g('docLineSpacing'),10);
-    const h1=parseInt(g('h1Size'),10)*2, h2=parseInt(g('h2Size'),10)*2, body=parseInt(g('bodySize'),10)*2;
-    const margin=g('docMarginType')==='binding'?{top:1440,bottom:1440,left:1800,right:1440}:{top:1440,bottom:1440,left:1440,right:1440};
-    const wantCover=document.getElementById('optCoverPage').checked;
-    const wantToc=document.getElementById('optToc').checked;
-    const chapterBreak=document.getElementById('optChapterBreak').checked;
-    const pTitle=g('projectTitle').trim(), pAgency=g('agencyName').trim(), pVendor=g('vendorName').trim();
-    const children=[];
-
-    if(wantCover){
-      const c=(text,size,bold,color,before,after)=>new Paragraph({alignment:AlignmentType.CENTER,spacing:{before,after},
-        children:[new TextRun({text,font:fontCn,size,bold,color})]});
-      children.push(c(pAgency||'招標機關',Math.round(h1*0.9),false,'475569',2000,300));
-      children.push(c(pTitle||'服務建議書',Math.round(h1*1.5),true,'103F3B',300,600));
-      children.push(c('【服務建議書（初稿草案）】',body,false,'64748B',200,1200));
-      children.push(c('投標廠商：'+(pVendor||'投標團隊'),Math.round(body*1.15),true,'1E293B',1800,200));
-      const now=new Date();
-      children.push(c('中華民國 '+(now.getFullYear()-1911)+' 年 '+(now.getMonth()+1)+' 月',body,false,'64748B',100,400));
-      children.push(new Paragraph({text:'',pageBreakBefore:true}));
-    }
-    if(wantToc){
-      children.push(new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:240},
-        children:[new TextRun({text:'目　錄',font:fontCn,size:h1,bold:true,color:'103F3B'})]}));
-      children.push(new TableOfContents('目錄',{hyperlink:true,headingStyleRange:'1-3'}));
-      children.push(new Paragraph({text:'',pageBreakBefore:true}));
-    }
-
-    const lines=cur.content.split('\n');
-    let firstH1=true;
-    for(let i=0;i<lines.length;i++){
-      const t=lines[i].trim();
-      if(!t){ children.push(new Paragraph({text:'',spacing:{after:80}})); continue; }
-
-      if(isRow(t)&&i+1<lines.length&&isDiv(lines[i+1])){
-        const header=splitRow(t); const data=[]; let j=i+2;
-        while(j<lines.length&&isRow(lines[j])){ data.push(splitRow(lines[j])); j++; }
-        const cols=header.length;
-        const cell=(text,hd)=>new TableCell({width:{size:Math.floor(100/cols),type:WidthType.PERCENTAGE},
-          shading:hd?{fill:'EEF4F2'}:undefined, margins:{top:60,bottom:60,left:100,right:100},
-          children:[new Paragraph({spacing:{line:240},children:inlineRuns(text,{font:fontCn,size:Math.round(body*0.9),color:'1F2937',bold:hd})})]});
-        const rows=[new TableRow({tableHeader:true,children:header.map(h=>cell(h,true))})];
-        data.forEach(r=>{ const p=r.slice(0,cols); while(p.length<cols) p.push(''); rows.push(new TableRow({children:p.map(c=>cell(c,false))})); });
-        const bd={style:BorderStyle.SINGLE,size:4,color:'CBD5E1'};
-        children.push(new Table({width:{size:100,type:WidthType.PERCENTAGE},rows,
-          borders:{top:bd,bottom:bd,left:bd,right:bd,insideHorizontal:bd,insideVertical:bd}}));
-        children.push(new Paragraph({text:'',spacing:{after:120}}));
-        i=j-1; continue;
-      }
-
-      if(/^#\s+/.test(t)){
-        children.push(new Paragraph({heading:HeadingLevel.HEADING_1,pageBreakBefore:chapterBreak&&!firstH1,
-          spacing:{before:360,after:180,line},children:inlineRuns(t.replace(/^#\s+/,''),{font:fontCn,size:h1,bold:true,color:'103F3B'})}));
-        firstH1=false;
-      } else if(/^##\s+/.test(t)){
-        children.push(new Paragraph({heading:HeadingLevel.HEADING_2,spacing:{before:240,after:120,line},
-          children:inlineRuns(t.replace(/^##\s+/,''),{font:fontCn,size:h2,bold:true,color:'1F2937'})}));
-      } else if(/^###\s+/.test(t)){
-        children.push(new Paragraph({heading:HeadingLevel.HEADING_3,spacing:{before:180,after:80,line},
-          children:inlineRuns(t.replace(/^###\s+/,''),{font:fontCn,size:Math.round(body*1.1),bold:true,color:'334155'})}));
-      } else if(/^[-*+]\s+/.test(t)){
-        children.push(new Paragraph({bullet:{level:0},spacing:{after:60,line},
-          children:inlineRuns(t.replace(/^[-*+]\s+/,''),{font:fontCn,size:body,color:'334155'})}));
-      } else if(/^\d+[.)]\s+/.test(t)){
-        children.push(new Paragraph({numbering:{reference:'ol',level:0},spacing:{after:60,line},
-          children:inlineRuns(t.replace(/^\d+[.)]\s+/,''),{font:fontCn,size:body,color:'334155'})}));
-      } else if(/^>\s?/.test(t)){
-        children.push(new Paragraph({spacing:{after:100,line},indent:{left:480},
-          children:inlineRuns(t.replace(/^>\s?/,''),{font:fontCn,size:body,color:'475569'})}));
-      } else if(/^(-{3,}|\*{3,}|_{3,})$/.test(t)){
-        children.push(new Paragraph({text:'',border:{bottom:{style:BorderStyle.SINGLE,size:6,color:'CBD5E1'}},spacing:{after:120}}));
-      } else {
-        children.push(new Paragraph({spacing:{after:120,line},children:inlineRuns(t,{font:fontCn,size:body,color:'334155'})}));
-      }
-    }
-
-    const doc=new Document({
-      numbering:{config:[{reference:'ol',levels:[{level:0,format:(LevelFormat&&LevelFormat.DECIMAL)||'decimal',text:'%1.',
-        alignment:AlignmentType.START,style:{paragraph:{indent:{left:720,hanging:360}}}}]}]},
-      sections:[{properties:{page:{margin}},
-        footers:{default:new Footer({children:[new Paragraph({alignment:AlignmentType.CENTER,children:[
-          new TextRun({text:'第 ',font:fontCn,size:20}),
-          new TextRun({children:[PageNumber.CURRENT],size:20}),
-          new TextRun({text:' 頁',font:fontCn,size:20})]})]})},
-        children}]
-    });
-    dl(await Packer.toBlob(doc),(pTitle?pTitle+'_':'')+cur.label+'.docx');
-    toast('Word 已匯出','success');
-  }catch(err){ console.error(err); toast('匯出失敗：'+err.message,'error'); }
-}
-
 /* ================= 備份 ================= */
 function exportBackup(){
-  const data={version:2,exportedAt:new Date().toISOString(),settings:LS.get(K.SETTINGS,null),
-    outputs,checklist,templates:promptTemplates,tracked,compare:compareList,watch:watchKeywords,
-    docs:documentVault.map(d=>({name:d.name,ext:d.ext,size:d.size,text:d.text,wordCount:d.wordCount,selected:d.selected}))};
+  const data={version:3,exportedAt:new Date().toISOString(),
+    tracked,compare:compareList,watch:watchKeywords};
   dl(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),'標案參謀室備份_'+new Date().toISOString().slice(0,10)+'.json');
-  toast('備份已下載（不含金鑰）','success');
+  toast('備份已下載','success');
 }
 document.getElementById('backupInput').addEventListener('change',async e=>{
   const f=e.target.files[0]; if(!f) return;
   try{
     const d=JSON.parse(await f.text());
-    if(d.settings){ LS.set(K.SETTINGS,d.settings); loadSettings(); }
-    if(Array.isArray(d.outputs)){ outputs=d.outputs; activeOutputId=outputs.length?outputs[0].id:null; persistOutputs(); }
-    if(Array.isArray(d.checklist)){ checklist=d.checklist; LS.set(K.CHECKLIST,checklist); }
-    if(Array.isArray(d.templates)){ promptTemplates=d.templates; LS.set(K.TEMPLATES,promptTemplates); renderTemplates(); }
     if(Array.isArray(d.tracked)){ tracked=d.tracked; LS.set(K.TRACKED,tracked); }
     if(Array.isArray(d.compare)){ compareList=d.compare; LS.set(K.COMPARE,compareList); }
     if(Array.isArray(d.watch)){ watchKeywords=d.watch; LS.set(K.WATCH,watchKeywords); renderWatchChips(); }
-    if(Array.isArray(d.docs)){ documentVault=d.docs.map(x=>({...x,id:Date.now()+'-'+Math.random().toString(36).slice(2,7),selected:x.selected!==false})); persistDocs(); }
-    renderFileTable(); renderOutputTabs(); renderDraft(); renderChecklist(); updateCounters();
+    updateCounters();
     toast('備份已匯入','success');
   }catch(err){ toast('匯入失敗：格式不對','error'); }
   e.target.value='';
 });
 function wipeAll(){
-  if(!confirm('會清掉文件、草稿、追蹤、快取與所有設定（含金鑰），確定？')) return;
+  if(!confirm('會清掉追蹤、比較、關鍵字、決標金額快取與公告快取，確定？')) return;
   Object.values(K).forEach(k=>LS.del(k)); location.reload();
 }
 
 /* ================= 啟動 ================= */
 window.addEventListener('DOMContentLoaded',()=>{
-  loadSettings(); renderFileTable(); renderOutputTabs(); renderDraft(); renderChecklist(); renderTemplates();
-  document.getElementById('customPromptInput').value=LS.get(K.CUSTOM_PROMPT,'');
-  document.getElementById('aiModelBadge').textContent=getModel();
-  SETTING_FIELDS.concat(CHECK_FIELDS).forEach(id=>{
-    const el=document.getElementById(id);
-    el.addEventListener('change',saveSettings);
-    el.addEventListener('input',()=>{ clearTimeout(window.__st); window.__st=setTimeout(saveSettings,400); });
-  });
   document.getElementById('searchQuery').addEventListener('keydown',e=>{ if(e.key==='Enter') doSearch(1); });
   document.getElementById('companyQuery').addEventListener('keydown',e=>{ if(e.key==='Enter') doCompanySearch(); });
-  document.getElementById('newChecklistInput').addEventListener('keydown',e=>{ if(e.key==='Enter') addChecklistItem(); });
-  document.getElementById('followUpInput').addEventListener('keydown',e=>{ if(e.key==='Enter') runFollowUp(); });
   document.getElementById('liveKeyword').addEventListener('keydown',e=>{ if(e.key==='Enter') doLiveSearch(); });
   document.getElementById('watchInput').addEventListener('keydown',e=>{ if(e.key==='Enter') addWatchKeyword(); });
   renderWatchChips(); checkProxy(false);
