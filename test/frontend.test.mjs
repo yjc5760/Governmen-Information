@@ -126,6 +126,75 @@ test('buildSeries 認得兩年一次的系列，且單次案不算系列', () =>
   assert.ok(s[0].gap > 700 && s[0].gap < 760, '兩年一次的間隔應約 730 天，實得 ' + s[0].gap);
 });
 
+test('cycleLabel 只把接近真實週期的間隔標為規律', () => {
+  const c = app.cycleLabel;
+  assert.equal(c(365).label, '年度');   assert.equal(c(365).ok, true);
+  assert.equal(c(370).label, '年度');
+  assert.equal(c(730).label, '兩年一次');
+  assert.equal(c(1095).label, '三年一次');
+  // 實測在台電資料裡踩到的：流標後 174 天重招，不可被當成半年週期。
+  // 刻意不設「半年」類 —— 單一個 150~250 天的間隔無法跟流標重招區分。
+  assert.equal(c(174).ok, false, '174 天應判為不規律');
+  assert.equal(c(183).ok, false, '刻意不把 183 天當成規律的半年週期');
+  assert.equal(c(250).ok, false);
+  assert.equal(c(500).ok, false);
+});
+
+test('buildSeries 不把跨曆年的流標重招算成短週期（實測踩到的 bug）', () => {
+  // 台電實例：2025/08/14 招標 → 流標 → 2026/02/04 重招，相隔 174 天。
+  // 原本按「每曆年取最早一次」去重，這兩筆分屬 2025 與 2026 年而雙雙留下，
+  // 於是 174 天被當成半年一次的循環，還跟 5/5 命中的年度案並列。
+  const recs = [
+    rec('20250814','公開招標公告','114年緊急應變中心設施更新','F-114'),
+    rec('20260204','公開招標公告','115年緊急應變中心設施更新','F-115')
+  ];
+  const s = app.buildSeries(recs);
+  assert.equal(s.length, 0, '相隔不到 240 天應收攏成同一輪，收攏後只剩一輪就不算系列');
+});
+
+test('buildSeries 收攏同一輪，但保留真正的年度間隔', () => {
+  const recs = [
+    rec('20250310','公開招標公告','114年度清潔勞務工作','B-114'),
+    rec('20250420','公開招標公告','114年度清潔勞務工作（第2次）','B-114-2'), // 41 天後重招 → 同一輪
+    rec('20260315','公開招標公告','115年度清潔勞務工作','B-115')
+  ];
+  const s = app.buildSeries(recs);
+  assert.equal(s.length, 1);
+  assert.equal(s[0].count, 2, '同一輪的重招不該讓輪數變成 3');
+  assert.ok(Math.abs(s[0].gap - 370) <= 10, '間隔應是 2025/03→2026/03，實得 ' + s[0].gap);
+  assert.equal(s[0].regular, true);
+  assert.equal(s[0].cycle, '年度');
+});
+
+test('buildSeries 不規律的系列會被標記且排在規律的後面', () => {
+  const recs = [
+    // 規律年度案
+    rec('20240310','公開招標公告','113年度昇降機維護工作','A-113'),
+    rec('20250311','公開招標公告','114年度昇降機維護工作','A-114'),
+    rec('20260309','公開招標公告','115年度昇降機維護工作','A-115'),
+    // 間隔 250 天，不規律
+    rec('20250101','公開招標公告','某偶發設施改善工程','G-1'),
+    rec('20250908','公開招標公告','某偶發設施改善工程','G-2')
+  ];
+  const s = app.buildSeries(recs);
+  assert.equal(s.length, 2);
+  assert.equal(s[0].regular, true, '規律的應排在前面');
+  assert.equal(s[1].regular, false);
+  assert.equal(s[1].cycle, '不規律');
+});
+
+test('unitRecKey 能認出分頁重抓造成的完全重複，但不誤殺同案同日的不同紀錄', () => {
+  const k = app.unitRecKey;
+  const a = { filename:'RML-1-70008398', job_number:'0141300008', date:20260707,
+              brief:{ type:'拒絕往來廠商名單公告', title:'X', companies:{ names:['協富消防安全設備股份有限公司'] } } };
+  const aCopy = JSON.parse(JSON.stringify(a));
+  // 實測案例：同案號、同日、同類型，但廠商與 filename 不同 —— 這是兩筆不同的紀錄
+  const b = { filename:'RML-1-70008397', job_number:'0141300008', date:20260707,
+              brief:{ type:'拒絕往來廠商名單公告', title:'X', companies:{ names:['世詠消防安全設備有限公司'] } } };
+  assert.equal(k(a), k(aCopy), '一字不差的重複應產生同一個鍵');
+  assert.notEqual(k(a), k(b), '同案同日不同廠商不可被當成重複');
+});
+
 test('buildSeries 同年多次招標只取當年最早一次', () => {
   const recs = [
     rec('20250310','公開招標公告','114年度清潔勞務工作','B-114'),

@@ -977,30 +977,110 @@ function fmtWan(n){ if(!n) return '—';
   if(n>=1e4) return Math.round(n/1e4).toLocaleString()+' 萬';
   return n.toLocaleString()+' 元'; }
 
+/* 大機關的公告量很可觀（台電總公司 3.13.31 有 4 萬則、41 頁、每頁 1000 筆約 630KB）。
+   實測連續抓 15 頁之後第 16 頁就會 Failed to fetch——API 對連續大量請求會斷線。
+   所以：每輪只抓固定頁數、頁間拉長間隔、單頁失敗會退避重試，
+   而且不管是被擋還是撞到上限，都保留已經抓到的資料並在畫面上說清楚沒抓完。 */
+const AGENCY_PAGE_CAP = 15;                 // 每輪最多頁數
+const AGENCY_PAGE_GAP = 700;                // 頁間間隔（毫秒）
+const AGENCY_RETRY    = [1500,4000,9000];   // 單頁失敗的退避重試
+
+/* 分頁去重：抓第 N 頁與第 N+1 頁之間官網若新增公告，位移會讓邊界紀錄被重抓
+   （實測台電總公司 30,000 筆裡有 34 筆一字不差的重複，多數貼齊每千筆邊界）。
+   filename 不是唯一鍵（會被多筆共用），job+date+type 也不是（同案同日可有多則，
+   例如各廠商一則的拒絕往來名單），所以用複合鍵——實測與整筆 JSON 比對結果完全一致，
+   但快 4 倍以上。 */
+function unitRecKey(r){
+  return [r.filename, r.job_number, r.date, (r.brief&&r.brief.type)||'',
+          ((r.brief&&r.brief.companies&&r.brief.companies.names)||[]).join('')].join(' ');
+}
+
+async function fetchUnitPage(unit_id,page,onRetry){
+  let last;
+  for(let i=0;i<=AGENCY_RETRY.length;i++){
+    if(i){ if(onRetry) onRetry(i,AGENCY_RETRY[i-1]); await new Promise(s=>setTimeout(s,AGENCY_RETRY[i-1])); }
+    try{ return await api('/api/listbyunit?unit_id='+encodeURIComponent(unit_id)+'&page='+page); }
+    catch(e){ last=e; }
+  }
+  throw last;
+}
+
+async function loadUnitPages(unit_id,startPage,existing,unit_name,say){
+  let all=existing.slice(), page=startPage, name=unit_name||'', tp=null, total=null, stop=null;
+  const seen=new Set(all.map(unitRecKey));
+  let dropped=0;
+  const cap=startPage+AGENCY_PAGE_CAP-1;
+  while(page<=cap){
+    let r;
+    try{
+      r=await fetchUnitPage(unit_id,page,(i,wait)=>
+        say('第 '+page+' 頁失敗，'+(wait/1000)+' 秒後重試（第 '+i+' 次）…已取得 '+fmtNum(all.length)+' 則'));
+    }catch(e){ stop={reason:'error',message:e.message,page}; break; }
+    name=r.unit_name||name;
+    tp=r.total_page||r.total_pages||tp||1;
+    if(r.total!=null) total=r.total;
+    const recs=r.records||[];
+    for(const rec of recs){
+      const k=unitRecKey(rec);
+      if(seen.has(k)){ dropped++; continue; }
+      seen.add(k); all.push(rec);
+    }
+    say('抓取 '+esc(name)+'：第 '+page+' / '+tp+' 頁，已取得 '+fmtNum(all.length)+' 則…');
+    if(page>=tp||!recs.length){ stop={reason:'done',page}; break; }
+    if(page>=cap){ stop={reason:'cap',page}; break; }
+    page++; await new Promise(s=>setTimeout(s,AGENCY_PAGE_GAP));
+  }
+  return {all,name,tp:tp||1,total,dropped,stop:stop||{reason:'cap',page},
+          pagesFetched:(stop&&stop.reason==='error')?page-1:page};
+}
+
 async function openAgency(unit_id,unit_name){
   go('agencies');
   const box=document.getElementById('agencyDetail');
   box.classList.remove('hidden');
-  const say=t=>box.innerHTML='<div class="card p-8 text-center text-sm text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>'+t+'</div>';
+  const say=t=>box.innerHTML='<div class="card p-8 text-center text-sm text-slate-500"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>'+t+'</div>';
   say('抓取 '+esc(unit_name||unit_id)+' 的公告…');
   window.scrollTo(0,0);
-  try{
-    let page=1,all=[],name=unit_name||'',tp=1;
-    while(page<=25){
-      const r=await api('/api/listbyunit?unit_id='+encodeURIComponent(unit_id)+'&page='+page);
-      name=r.unit_name||name;
-      tp=r.total_page||r.total_pages||1;
-      const recs=r.records||[];
-      all=all.concat(recs);
-      say('抓取 '+esc(name)+'：第 '+page+' / '+tp+' 頁，已取得 '+fmtNum(all.length)+' 則…');
-      if(page>=tp||!recs.length) break;
-      page++; await new Promise(s=>setTimeout(s,300));
-    }
-    unitData={unit_id,unit_name:name,records:all};
-    if(noteAgency(unit_id,name)) persistAgencyIndex();
-    unitVendorQ=''; unitSort='count';
-    renderAgencyDetail();
-  }catch(e){ box.innerHTML='<div class="card p-6 text-sm text-rose-600">載入失敗：'+esc(e.message)+'</div>'; }
+  const r=await loadUnitPages(unit_id,1,[],unit_name,say);
+  if(!r.all.length){
+    const msg=(r.stop.reason==='error')?('第 '+r.stop.page+' 頁抓取失敗：'+r.stop.message):'這個機關沒有公告紀錄';
+    box.innerHTML='<div class="card p-6 space-y-3"><p class="text-sm text-rose-600">載入失敗：'+esc(msg)+'</p>'+
+      '<button onclick="openAgency('+JSON.stringify(unit_id)+','+JSON.stringify(unit_name||'')+')" class="px-3 py-2 text-xs border rounded-lg hover:bg-slate-50">重試</button></div>';
+    return;
+  }
+  unitData={unit_id,unit_name:r.name,records:r.all,total:r.total,totalPages:r.tp,
+            pagesFetched:r.pagesFetched,stop:r.stop,dropped:r.dropped};
+  if(noteAgency(unit_id,r.name)) persistAgencyIndex();
+  unitVendorQ=''; unitSort='count';
+  renderAgencyDetail();
+}
+
+/* 從上次停下來的頁數接著抓，已取得的資料不重抓 */
+async function continueAgency(){
+  if(!unitData) return;
+  const btnBox=document.getElementById('agencyMore');
+  const say=t=>{ if(btnBox) btnBox.innerHTML='<span class="text-xs text-amber-900"><i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i>'+t+'</span>'; };
+  const from=unitData.pagesFetched+1;
+  if(unitData.totalPages && from>unitData.totalPages){ toast('已經抓到最後一頁','info'); return; }
+  say('從第 '+from+' 頁繼續…');
+  const r=await loadUnitPages(unitData.unit_id,from,unitData.records,unitData.unit_name,say);
+  const added=r.all.length-unitData.records.length;
+  unitData={unit_id:unitData.unit_id,unit_name:r.name,records:r.all,
+            total:r.total!=null?r.total:unitData.total,
+            totalPages:r.tp||unitData.totalPages,pagesFetched:r.pagesFetched,stop:r.stop,
+            dropped:(unitData.dropped||0)+r.dropped};
+  renderAgencyDetail();
+  if(r.stop.reason==='error') toast('又補了 '+fmtNum(added)+' 則，但第 '+r.stop.page+' 頁被擋下，稍等一下再續抓','warning');
+  else if(r.stop.reason==='done') toast('補了 '+fmtNum(added)+' 則，已經抓到最後一頁','success');
+  else toast('補了 '+fmtNum(added)+' 則','success');
+}
+
+/* 涵蓋範圍：拿到多少 / 官方總共多少 / 抓到第幾頁 */
+function agencyCoverage(){
+  if(!unitData) return null;
+  const st=unitData.stop||{reason:'cap',page:unitData.pagesFetched||0};
+  return { got:unitData.records.length, total:unitData.total, tp:unitData.totalPages||1,
+           pf:unitData.pagesFetched||0, complete:st.reason==='done', stop:st };
 }
 function closeAgency(){ unitData=null; document.getElementById('agencyDetail').classList.add('hidden'); }
 function setUnitPeriod(y){ unitPeriod=y; renderAgencyDetail(); }
@@ -1029,8 +1109,33 @@ function vendorStats(recs){
   return Object.values(map);
 }
 
+function coverageBanner(){
+  const c=agencyCoverage();
+  if(!c || c.complete) return '';
+  const pct=c.total?Math.round(c.got/c.total*100):null;
+  return '<div class="rounded-2xl bg-amber-50 border border-amber-200 p-4">'+
+    '<div class="flex items-start gap-3 flex-wrap">'+
+      '<i class="fa-solid fa-triangle-exclamation text-amber-600 mt-0.5"></i>'+
+      '<div class="min-w-0 flex-1 text-xs text-amber-900 leading-relaxed">'+
+        '<strong>這個機關的公告還沒抓完，底下每一項統計都只涵蓋已取得的部分。</strong><br>'+
+        '已取得 <strong>'+fmtNum(c.got)+'</strong> 則'+
+        (c.total?(' / 官方共 '+fmtNum(c.total)+' 則'+(pct!=null?('（'+pct+'%）'):'')):'')+
+        '，第 1–'+c.pf+' 頁，共 '+c.tp+' 頁。'+
+        (c.stop.reason==='error'
+          ? '<br>第 '+c.stop.page+' 頁被擋下：'+esc(c.stop.message)+'。API 對連續大量請求會斷線，等十幾秒再續抓通常就過了。'
+          : '<br>一次最多抓 '+AGENCY_PAGE_CAP+' 頁，避免被 API 擋下。')+
+        '<br>公告是<strong>新到舊</strong>排序，所以手上這批是最近這幾年的；越早年的資料要繼續往下抓才會進來。'+
+      '</div>'+
+      '<div id="agencyMore" class="flex-shrink-0">'+
+        '<button onclick="continueAgency()" class="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium whitespace-nowrap">'+
+        '<i class="fa-solid fa-angles-down mr-1"></i>繼續往下抓 '+AGENCY_PAGE_CAP+' 頁</button>'+
+      '</div>'+
+    '</div></div>';
+}
+
 function renderAgencyDetail(){
   if(!unitData){ document.getElementById('agencyDetail').classList.add('hidden'); return; }
+  const cov=agencyCoverage();
   const per=unitPeriodRecords();
   const awards=per.filter(isAwardRec), tenders=per.filter(isTenderRec);
   const known=awards.filter(r=>amtOf(r.job_number));
@@ -1046,11 +1151,13 @@ function renderAgencyDetail(){
     '<div class="flex justify-between items-start gap-3">'+
       '<div class="min-w-0"><div class="eyebrow text-jade-500/90">AGENCY PROFILE</div>'+
       '<h3 class="text-lg font-bold mt-1 leading-snug"><i class="fa-solid fa-building-columns mr-2 text-jade-400"></i>'+esc(unitData.unit_name)+'</h3>'+
-      '<div class="text-[11px] text-white/40 mt-1 font-mono">'+esc(unitData.unit_id)+' · 收錄 '+span+'</div></div>'+
+      '<div class="text-[11px] text-white/40 mt-1 font-mono">'+esc(unitData.unit_id)+' · '+(cov&&cov.complete?'收錄':'已取得')+' '+span+'</div></div>'+
       '<button onclick="closeAgency()" class="text-white/50 hover:text-white p-1 flex-shrink-0"><i class="fa-solid fa-xmark text-lg"></i></button>'+
     '</div>'+
     '<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5">'+
-      '<div><div class="text-2xl font-bold">'+fmtNum(unitData.records.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">全期間公告</div></div>'+
+      '<div><div class="text-2xl font-bold">'+fmtNum(unitData.records.length)+
+        (cov&&cov.total&&!cov.complete?'<span class="text-sm font-normal text-white/40"> / '+fmtNum(cov.total)+'</span>':'')+
+        '</div><div class="text-[11px] text-white/50 mt-0.5">'+(cov&&cov.complete?'全期間公告':'已取得公告（未抓完）')+'</div></div>'+
       '<div><div class="text-2xl font-bold">'+fmtNum(awards.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">決標紀錄（'+(unitPeriod?('近'+unitPeriod+'年'):'全期')+'）</div></div>'+
       '<div><div class="text-2xl font-bold">'+fmtNum(tenders.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">招標公告（同期）</div></div>'+
       '<div><div class="text-2xl font-bold">'+fmtNum(vs.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">得標廠商家數</div></div>'+
@@ -1058,9 +1165,12 @@ function renderAgencyDetail(){
     '<div class="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">'+
       '<span class="text-white/50">已補齊決標金額合計</span><span class="text-lg font-bold text-jade-300">'+fmtWan(sum)+'</span>'+
       '<span class="text-white/40">'+known.length+' / '+awards.length+' 案有金額'+(need?('，'+need+' 案未補'):'')+'</span>'+
+      (unitData.dropped?('<span class="text-white/40" title="抓分頁時官網又新增了公告，位移導致邊界紀錄被重抓，已濾掉">已濾除 '+fmtNum(unitData.dropped)+' 筆分頁重複</span>'):'')+
       '<button onclick="listUnitRecords()" class="ml-auto px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs">在情報中心列出全部公告</button>'+
     '</div>'+
   '</div>'+
+
+  coverageBanner()+
 
   '<div class="grid lg:grid-cols-3 gap-4">'+
     '<div class="lg:col-span-2 card p-5">'+
@@ -1114,6 +1224,26 @@ function median(arr){ if(!arr.length) return null;
   const a=arr.slice().sort((x,y)=>x-y), m=a.length>>1;
   return a.length%2 ? a[m] : Math.round((a[m-1]+a[m])/2); }
 
+/* 同一輪招標可能出現多次（流標重招、分批、跨曆年的第2次公告）。
+   原本按「每個曆年取最早一次」去重，但台電實例 2025/08/14 流標、2026/02/04 重招
+   跨了曆年而雙雙留下，於是 174 天被當成半年週期，還跟 5/5 命中的年度案並列。
+   改成不管曆年，只要距離上一次不到 MIN_ROUND_GAP 天就視為同一輪。
+   門檻取 240 天：流標重招最久可拖到半年左右，而年度案是 365 天，兩者分得開。
+   真正的半年約會被收攏成一年一次——但 seriesKey 本來就把「上／下半年」併成同一系列，
+   所以不會誤殺，只是改用年度節奏預估。 */
+const MIN_ROUND_GAP = 240;
+
+/* 間隔像不像一個真的週期。刻意不設「半年」這一類：單一個 150~250 天的間隔，
+   光看數字無法跟流標重招區分，寧可標成不規律也不要給出看似精確的錯預測。
+   不規律的照樣列出來，但要標記並淡化，不能跟 5/5 命中的年度案並列。 */
+function cycleLabel(gap){
+  const near=(v,t,tol)=>Math.abs(v-t)<=tol;
+  if(near(gap,365,60))  return {label:'年度',     ok:true};
+  if(near(gap,730,90))  return {label:'兩年一次', ok:true};
+  if(near(gap,1095,120))return {label:'三年一次', ok:true};
+  return {label:'不規律', ok:false};
+}
+
 function buildSeries(recs){
   const map=new Map();
   recs.forEach(r=>{
@@ -1127,26 +1257,30 @@ function buildSeries(recs){
   const out=[]; const now=new Date();
   map.forEach(sr=>{
     sr.items.sort((a,b)=>a.d-b.d);
-    // 每年只取該年最早一次招標，免得更正、分批或當年重招把週期算壞
-    const byYear=new Map();
-    sr.items.forEach(it=>{ const y=it.d.getFullYear(); if(!byYear.has(y)) byYear.set(y,it); });
-    const yearly=[...byYear.values()].sort((a,b)=>a.d-b.d);
-    if(yearly.length<2) return;                    // 只出現一次的不算系列
+    // 收攏同一輪：距離上一次不到 MIN_ROUND_GAP 天的都算同一輪，只留最早那一次
+    const yearly=[];
+    sr.items.forEach(it=>{
+      const prev=yearly[yearly.length-1];
+      if(!prev || (it.d-prev.d)/86400000 >= MIN_ROUND_GAP) yearly.push(it);
+    });
+    if(yearly.length<2) return;                    // 只辦過一輪的不算系列
     const gaps=[]; for(let i=1;i<yearly.length;i++) gaps.push(Math.round((yearly[i].d-yearly[i-1].d)/86400000));
     const gap=median(gaps);
+    const cyc=cycleLabel(gap);
     const last=yearly[yearly.length-1];
     const next=new Date(last.d.getTime()+gap*86400000);
     const months={}; yearly.forEach(it=>{ const m=it.d.getMonth()+1; months[m]=(months[m]||0)+1; });
     const top=Object.entries(months).sort((a,b)=>b[1]-a[1])[0];
     out.push({ key:sr.key, title:last.title, yearly, gap, next, count:yearly.length,
       lastDate:last.date, monthMode:+top[0], monthHits:top[1],
+      cycle:cyc.label, regular:cyc.ok,
       daysToNext: Math.ceil((next-now)/86400000) });
   });
   // 即將到來的排前面（-60 到 365 天視為值得注意）
+  // 先看「規律且即將到來」的，不規律的一律往後排
   return out.sort((a,b)=>{
-    const ka=(a.daysToNext>=-60&&a.daysToNext<=365)?0:1;
-    const kb=(b.daysToNext>=-60&&b.daysToNext<=365)?0:1;
-    return ka-kb || a.daysToNext-b.daysToNext;
+    const rank=x=>(x.regular?0:2)+((x.daysToNext>=-60&&x.daysToNext<=365)?0:1);
+    return rank(a)-rank(b) || a.daysToNext-b.daysToNext;
   });
 }
 
@@ -1171,22 +1305,29 @@ function rhythmBlock(){
   const all=unitData.records;
   const series=buildSeries(all);
   const fails=buildFailed(all);
-  const soon=series.filter(x=>x.daysToNext>=-30&&x.daysToNext<=120);
+  const soon=series.filter(x=>x.regular&&x.daysToNext>=-30&&x.daysToNext<=120);
+  const irregular=series.filter(x=>!x.regular).length;
   const openFails=fails.filter(f=>!f.reDate);
   const reLag=median(fails.filter(f=>f.lag!=null&&f.lag<1200).map(f=>f.lag));
 
   let h='<div class="card p-5">'+
     '<div class="eyebrow">PROCUREMENT RHYTHM</div>'+
     '<h3 class="font-bold text-ink-900 mt-1">發包節奏</h3>'+
-    '<p class="text-xs text-slate-500 mt-1">把年度性標案的名稱正規化成系列（去掉「115年度」這類年份），用歷年招標日的間隔中位數推下一次。全部由這份公告清單算出，沒有另外打 API。</p>';
+    '<p class="text-xs text-slate-500 mt-1">把年度性標案的名稱正規化成系列（去掉「115年度」這類年份），用歷年招標日的間隔中位數推下一次。全部由這份公告清單算出，沒有另外打 API。</p>'+
+    (function(){ const c=agencyCoverage();
+      return (c&&!c.complete)
+        ? '<p class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-2.5 mt-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>公告只抓到 '+fmtNum(c.got)+' 則（第 1–'+c.pf+' / '+c.tp+' 頁），而且是最近的那些。<strong>早年的招標紀錄還沒進來，所以系列的次數會偏低、間隔可能算錯。</strong>要當預測用請先把公告抓完。</p>'
+        : ''; })();
 
   if(!series.length && !fails.length){
     return h+'<p class="text-sm text-slate-400 text-center py-8">這個機關的公告裡找不到重複出現的標案系列，也沒有流標紀錄。</p></div>';
   }
 
   h+='<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">'+
-    '<div class="rounded-xl bg-jade-50 border border-jade-100 p-3"><div class="text-xl font-bold text-jade-700">'+series.length+'</div><div class="text-[11px] text-slate-500 mt-0.5">重複發包系列</div></div>'+
-    '<div class="rounded-xl bg-amber-50 border border-amber-100 p-3"><div class="text-xl font-bold text-amber-700">'+soon.length+'</div><div class="text-[11px] text-slate-500 mt-0.5">預估 120 日內招標</div></div>'+
+    '<div class="rounded-xl bg-jade-50 border border-jade-100 p-3"><div class="text-xl font-bold text-jade-700">'+(series.length-irregular)+
+      (irregular?'<span class="text-sm font-normal text-slate-400"> +'+irregular+' 不規律</span>':'')+
+      '</div><div class="text-[11px] text-slate-500 mt-0.5">規律發包系列</div></div>'+
+    '<div class="rounded-xl bg-amber-50 border border-amber-100 p-3"><div class="text-xl font-bold text-amber-700">'+soon.length+'</div><div class="text-[11px] text-slate-500 mt-0.5">規律且 120 日內招標</div></div>'+
     '<div class="rounded-xl bg-rose-50 border border-rose-100 p-3"><div class="text-xl font-bold text-rose-700">'+openFails.length+'</div><div class="text-[11px] text-slate-500 mt-0.5">流標後尚未重招</div></div>'+
     '<div class="rounded-xl bg-slate-50 border p-3"><div class="text-xl font-bold text-ink-900">'+(reLag!=null?reLag+' 天':'—')+'</div><div class="text-[11px] text-slate-500 mt-0.5">流標到重招中位數</div></div>'+
     '</div>';
@@ -1195,17 +1336,21 @@ function rhythmBlock(){
   h+='<div class="mt-5"><div class="text-xs font-semibold text-slate-600 mb-2">下次招標預估（依接近程度排序，顯示前 40 個系列）</div>'+
      '<div class="overflow-x-auto"><table class="w-full text-xs border-collapse min-w-[640px]">'+
      '<thead><tr class="bg-slate-50 text-slate-600">'+
-     '<th class="p-2 text-left border">標案系列</th><th class="p-2 text-center border whitespace-nowrap">次數</th>'+
+     '<th class="p-2 text-left border">標案系列</th><th class="p-2 text-center border whitespace-nowrap">週期</th>'+
+     '<th class="p-2 text-center border whitespace-nowrap">次數</th>'+
      '<th class="p-2 text-center border whitespace-nowrap">最近招標</th><th class="p-2 text-center border whitespace-nowrap">間隔</th>'+
      '<th class="p-2 text-center border whitespace-nowrap">下次預估</th><th class="p-2 text-center border whitespace-nowrap">距今</th>'+
      '<th class="p-2 text-left border whitespace-nowrap">慣例月份</th></tr></thead><tbody>';
   series.slice(0,40).forEach(x=>{
     const dd=x.daysToNext;
-    const cls = dd<0 ? 'text-slate-400' : dd<=60 ? 'text-rose-600 font-bold' : dd<=120 ? 'text-amber-600 font-semibold' : 'text-slate-600';
-    const near = dd>=-30&&dd<=120;
-    h+='<tr class="'+(near?'bg-amber-50/50':'')+'">'+
+    const cls = !x.regular ? 'text-slate-400' : dd<0 ? 'text-slate-400' : dd<=60 ? 'text-rose-600 font-bold' : dd<=120 ? 'text-amber-600 font-semibold' : 'text-slate-600';
+    const near = x.regular && dd>=-30 && dd<=120;
+    h+='<tr class="'+(near?'bg-amber-50/50':(x.regular?'':'opacity-60'))+'">'+
       '<td class="p-2 border"><div class="font-semibold text-ink-900 leading-snug">'+esc(x.title)+'</div>'+
         '<div class="text-[10px] text-slate-400 mt-0.5 font-mono">'+x.yearly.map(it=>fmtYmd(it.date)).join(' → ')+'</div></td>'+
+      '<td class="p-2 border text-center whitespace-nowrap">'+
+        (x.regular?'<span class="tag bg-jade-100 text-jade-700">'+x.cycle+'</span>'
+                  :'<span class="tag bg-slate-100 text-slate-500">'+x.cycle+'</span>')+'</td>'+
       '<td class="p-2 border text-center">'+x.count+'</td>'+
       '<td class="p-2 border text-center whitespace-nowrap font-mono">'+fmtYmd(x.lastDate)+'</td>'+
       '<td class="p-2 border text-center whitespace-nowrap">'+x.gap+' 天</td>'+
@@ -1215,7 +1360,9 @@ function rhythmBlock(){
       '</tr>';
   });
   h+='</tbody></table></div>'+
-     '<p class="text-[11px] text-slate-400 mt-2 leading-relaxed">「間隔」是歷年招標日相差天數的中位數，所以兩年一次的案子會顯示約 730 天。次數只有 2 次的預估很脆弱，看「慣例月份」的命中比例判斷可信度。過期未出現的系列可能已經停辦、改名或併案。</p></div>';
+     '<p class="text-[11px] text-slate-400 mt-2 leading-relaxed">「間隔」是各輪招標日相差天數的中位數。距離上一次不到 '+MIN_ROUND_GAP+' 天的視為<strong>同一輪</strong>（流標重招、分批、第2次公告），不會被算成一個短週期。'+
+     '間隔接近 365／730／1095 天才標為年度／兩年／三年，其餘標<strong>不規律</strong>並淡化——那些多半是偶發採購，預估值沒有意義。'+
+     '次數只有 2 次的預估很脆弱，要一起看「慣例月份」的命中比例。過期未出現的系列可能已經停辦、改名或併案。</p></div>';
 
   /* --- 流標重招 --- */
   if(fails.length){
