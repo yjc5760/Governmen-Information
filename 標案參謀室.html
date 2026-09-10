@@ -323,6 +323,8 @@ tailwind.config = { theme: { extend: { colors: {
           <button onclick="doCompanySearch()" class="px-4 py-2 bg-jade-600 text-white rounded-xl text-sm font-medium">查詢</button>
         </div>
       </div>
+      <div id="rivalPanel" class="mb-4"></div>
+      <div id="vendorCompare" class="mb-4"></div>
       <div class="card p-5 mb-4">
         <div class="eyebrow">FROM CACHE</div>
         <h3 class="font-bold text-ink-900 mt-1">已同步期間的得標廠商排行</h3>
@@ -389,7 +391,8 @@ const K = { BASE:'pi_api_base', TOKEN:'pi_api_token',
   DAYCACHE:'pi_daycache', TRACKED:'pi_tracked', COMPARE:'pi_compare',
   PROXY:'pi_proxy_base', WATCH:'pi_watch_keywords', AMOUNT:'pi_amount_cache',
   AGENCY:'pi_agency_index', CMPVIEW:'pi_compare_view',
-  SNAP:'pi_agency_snap', SNAPSEL:'pi_agency_snap_sel' };
+  SNAP:'pi_agency_snap', SNAPSEL:'pi_agency_snap_sel',
+  RIVALS:'pi_rivals', VSNAP:'pi_vendor_snap', VSNAPSEL:'pi_vendor_snap_sel' };
 
 /* pcc-viewer 公開設定檔裡的那組 token 已被 API 端擋掉（回 403）。
    openfun 這支 API 目前不帶 token 也能公開查詢，所以預設不送 Authorization。
@@ -409,6 +412,9 @@ let amountCache   = LS.get(K.AMOUNT, {});   // 'unit_id|job_number' -> {a:決標
 let agencyIndex   = LS.get(K.AGENCY, {});   // 機關名 -> unit_id；累積式，不隨公告快取一起被裁掉
 let agencySnaps   = LS.get(K.SNAP, {});    // unit_id -> 機關指標快照，供機關對比用
 let snapSel       = LS.get(K.SNAPSEL, []); // 目前勾選要對比的 unit_id
+let rivals        = LS.get(K.RIVALS, []);  // 常駐追蹤的對手廠商名稱
+let vendorSnaps   = LS.get(K.VSNAP, {});   // 廠商名 -> 指標快照，供廠商對比用
+let vsnapSel      = LS.get(K.VSNAPSEL, []);
 let proxyOk       = false;
 let currentTender = null;
 let calCursor     = new Date();
@@ -670,7 +676,7 @@ function go(page){
   if(page==='overview') renderOverview();
   if(page==='live'){ renderWatchChips(); checkProxy(false); }
   if(page==='agencies') renderAgencies();
-  if(page==='market') renderMarketRanking();
+  if(page==='market'){ renderMarketRanking(); renderRivals(); renderVendorCompare(); }
   if(page==='calendar') renderCalendar();
   if(page==='tracked') renderTracked();
   if(page==='compare') renderCompare();
@@ -830,6 +836,86 @@ async function openTender(unit_id,job_number,unit_name,title){
     refreshTrackBtn();
   }catch(e){ body.innerHTML='<p class="text-sm text-rose-600">載入失敗：'+esc(e.message)+'</p>'; }
 }
+/* ---------- 投標門檻雷達 ----------
+   招標公告的 detail 有 85 個欄位，真正決定「這案我方能不能投、要不要投」的只有十幾個。
+   把它們抽出來分組，並把「會增加負擔或風險」的那幾項標出來。
+   標記只針對客觀上多一道要求的情況，不替使用者判斷該不該投。 */
+const GATE_GROUPS = [
+  ['案件性質', [
+    ['是否屬統包',   ['是否屬統包'],            v=>/^是/.test(v) && '統包，需設計與施工整合'],
+    ['需技師簽證',   ['技師簽證'],              v=>/^是/.test(v) && '須依技師簽證規則辦理'],
+    ['是否特殊採購', ['是否屬特殊採購'],        v=>/^是/.test(v) && '特殊採購，資格門檻較高'],
+    ['標的分類',     ['標的分類','採購性質'],   null],
+    ['採購金額級距', ['採購金額級距','金額級距'], null]
+  ]],
+  ['競爭條件', [
+    ['決標方式',     ['決標方式'],              v=>/最低標/.test(v) && '以價格競爭為主'],
+    ['是否訂有底價', ['是否訂有底價'],          v=>/^否/.test(v) && '未訂底價'],
+    ['是否複數決標', ['是否複數決標'],          null],
+    ['協商措施',     ['是否採行協商措施'],      null],
+    ['適用 GPA',     ['政府採購協定'],          v=>/^是/.test(v) && '外商可參與，競爭範圍擴大'],
+    ['共同供應契約', ['是否屬共同供應契約'],    null]
+  ]],
+  ['資格與保證金', [
+    ['押標金',       ['押標金額度','是否須繳納押標金'], v=>v && !/^否/.test(v) && '須繳押標金'],
+    ['履約保證金',   ['是否須繳納履約保證金'],  v=>/^是/.test(v) && '須繳履約保證金'],
+    ['廠商資格摘要', ['廠商資格摘要'],          null],
+    ['基本資格文件', ['廠商應附具之基本資格證明文件'], null],
+    ['電子投標',     ['是否提供電子投標'],      null]
+  ]],
+  ['履約條件', [
+    ['履約期限',     ['履約期限'],              null],
+    ['履約地點',     ['履約地點'],              null],
+    ['後續擴充',     ['後續擴充'],              null],
+    ['物價指數調整', ['物價指數'],              null]
+  ]]
+];
+
+function gateBlock(d){
+  if(!d) return '';
+  const groups=[]; let flags=[];
+  GATE_GROUPS.forEach(([g,items])=>{
+    const rows=[];
+    items.forEach(([label,keys,flagFn])=>{
+      const raw=pick(d,keys); if(!raw) return;
+      const v=String(raw).trim();
+      const flag=flagFn?flagFn(v):null;
+      if(flag) flags.push(flag);
+      rows.push({label,v,flag});
+    });
+    if(rows.length) groups.push({g,rows});
+  });
+  if(!groups.length) return '';
+
+  let h='<div class="border rounded-2xl overflow-hidden">'+
+    '<div class="flex items-center justify-between gap-2 flex-wrap p-3 bg-slate-50 border-b">'+
+      '<div class="text-sm font-bold text-ink-900"><i class="fa-solid fa-shield-halved text-jade-600 mr-1.5"></i>投標門檻</div>'+
+      (flags.length
+        ? '<span class="tag bg-amber-100 text-amber-800">'+flags.length+' 項需要留意</span>'
+        : '<span class="tag bg-jade-100 text-jade-700">沒有額外門檻</span>')+
+    '</div>';
+  if(flags.length){
+    h+='<div class="p-3 bg-amber-50 border-b border-amber-100 flex flex-wrap gap-1.5">'+
+      flags.map(f=>'<span class="tag bg-white border border-amber-200 text-amber-800">'+esc(f)+'</span>').join('')+
+      '</div>';
+  }
+  groups.forEach(({g,rows})=>{
+    h+='<div class="p-3 border-b last:border-0">'+
+      '<div class="text-[11px] font-bold text-jade-700 mb-2">'+esc(g)+'</div>'+
+      '<div class="space-y-1.5">';
+    rows.forEach(r=>{
+      const long=r.v.length>60;
+      h+='<div class="flex gap-2 items-start text-xs '+(r.flag?'bg-amber-50 -mx-1 px-1 py-1 rounded':'')+'">'+
+        '<span class="w-24 flex-shrink-0 text-slate-500">'+esc(r.label)+'</span>'+
+        '<span class="flex-1 min-w-0 '+(r.flag?'text-amber-900 font-semibold':'text-ink-900')+' '+(long?'leading-relaxed':'')+'" '+
+          (long?('title="'+esc(r.v)+'"'):'')+'>'+esc(long?r.v.slice(0,60)+'…':r.v)+'</span>'+
+        '</div>';
+    });
+    h+='</div></div>';
+  });
+  return h+'</div>';
+}
+
 function renderTenderBody(){
   const t=currentTender, d=t.detail;
   const dl=parseTwDate(t.deadline), left=daysLeft(dl);
@@ -860,6 +946,8 @@ function renderTenderBody(){
     '<div class="border-t border-white/10 pt-3"><div class="text-xs text-white/60"><i class="fa-solid fa-dollar-sign mr-1.5"></i>採購預算</div>'+
     '<div class="text-xl font-bold mt-1">'+(parseMoney(t.budget)?('$'+fmtNum(parseMoney(t.budget))):(esc(t.budget)||'未公開'))+'</div></div>'+
     '</div>';
+
+  html+=gateBlock(d);
 
   html+='<div class="border rounded-2xl divide-y">';
   key.forEach(r=>{ html+='<div class="p-3"><div class="text-[11px] text-slate-500">'+esc(r[0])+'</div><div class="text-sm font-semibold text-ink-900 mt-0.5">'+esc(r[1])+'</div></div>'; });
@@ -1916,6 +2004,280 @@ function renderMarketRanking(){
     box.appendChild(el);
   });
 }
+/* ================= 對手常駐追蹤與廠商對比 =================
+   searchbycompanyname 每頁只有 20 筆（中興工程顧問實測 4,681 筆、47 頁），
+   所以不可能抓全。這裡預設每家抓 3 頁（60 筆），目的是看「最近在幹什麼」，
+   不是統計全歷史——所有數字都標明是抓取範圍內的。
+   回傳的 brief.companies.names 會列出該案所有得標廠商，包含共同投標的夥伴，
+   所以順便算得出「常見合作夥伴」。 */
+const RIVAL_PAGES = 3;
+const RIVAL_PAGE_GAP = 400;
+const VSNAP_MAX = 20;
+const RIVAL_SUGGEST = ['中興工程顧問','台灣世曦工程顧問','亞新工程顧問','中鼎工程','泰興工程顧問','聯邦工程顧問'];
+
+function sameVendor(a,b){
+  const x=vendorShort(String(a||'')).replace(/[\s()（）]/g,'');
+  const y=vendorShort(String(b||'')).replace(/[\s()（）]/g,'');
+  if(!x||!y) return false;
+  return x===y || x.indexOf(y)>=0 || y.indexOf(x)>=0;
+}
+function isRealAward(t){
+  t=String(t||'');
+  return t.indexOf('決標公告')>=0 && t.indexOf('無法')<0 && t.indexOf('更正')<0;
+}
+
+async function fetchVendor(name,pages,say){
+  const recs=[]; let total=null, tp=null, p=1;
+  for(; p<=pages; p++){
+    if(say) say('抓取 '+name+'：第 '+p+' 頁…已取得 '+recs.length+' 筆');
+    const r=await api('/api/searchbycompanyname?query='+encodeURIComponent(name)+'&page='+p);
+    if(r.total_records!=null) total=r.total_records;
+    tp=r.total_pages||tp;
+    const rows=r.records||[];
+    rows.forEach(x=>{
+      noteAgency(x.unit_id,x.unit_name);
+      recs.push({ u:x.unit_id, n:x.unit_name, d:String(x.date||''), j:x.job_number,
+                  t:(x.brief&&x.brief.type)||'', ti:(x.brief&&x.brief.title)||'',
+                  c:((x.brief&&x.brief.companies&&x.brief.companies.names)||[]) });
+    });
+    if(!rows.length || (tp && p>=tp)) break;
+    if(p<pages) await new Promise(s=>setTimeout(s,RIVAL_PAGE_GAP));
+  }
+  persistAgencyIndex();
+  return { recs, total, tp, pages:Math.min(p,pages) };
+}
+
+function buildVendorSnap(name,res){
+  const awards=res.recs.filter(r=>isRealAward(r.t));
+  const agencies={}, partners={}, years={};
+  awards.forEach(r=>{
+    if(r.n) agencies[r.n]=(agencies[r.n]||0)+1;
+    const y=r.d.slice(0,4); if(y) years[y]=(years[y]||0)+1;
+    const seen={};
+    (r.c||[]).forEach(o=>{
+      if(sameVendor(o,name)) return;               // 排除自己
+      const k=vendorShort(o); if(!k||seen[k]) return; seen[k]=1;
+      partners[k]=(partners[k]||0)+1;
+    });
+  });
+  const top=(obj,k)=>Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,k);
+  return {
+    name, at:Date.now(), total:res.total, tp:res.tp, pages:res.pages,
+    fetched:res.recs.length, awards:awards.length,
+    corrections:res.recs.filter(r=>String(r.t).indexOf('更正')>=0).length,
+    agencies:top(agencies,30), partners:top(partners,15),
+    years:Object.entries(years).sort(),
+    recent:awards.slice(0,8).map(r=>({d:r.d,n:r.n,ti:r.ti}))
+  };
+}
+
+function persistVendorSnaps(){
+  const names=Object.keys(vendorSnaps);
+  if(names.length>VSNAP_MAX){
+    names.sort((a,b)=>vendorSnaps[a].at-vendorSnaps[b].at)
+         .slice(0,names.length-VSNAP_MAX).forEach(x=>delete vendorSnaps[x]);
+  }
+  LS.set(K.VSNAP,vendorSnaps);
+}
+
+function addRival(name){
+  const v=String(name!=null?name:document.getElementById('rivalInput').value||'').trim();
+  if(!v) return;
+  if(rivals.some(x=>sameVendor(x,v))){ toast('已經在追蹤清單裡','info'); return; }
+  rivals.push(v); LS.set(K.RIVALS,rivals);
+  const inp=document.getElementById('rivalInput'); if(inp) inp.value='';
+  renderRivals();
+  refreshOneRival(v);
+}
+function removeRival(name){
+  rivals=rivals.filter(x=>x!==name); LS.set(K.RIVALS,rivals);
+  delete vendorSnaps[name]; persistVendorSnaps();
+  vsnapSel=vsnapSel.filter(x=>x!==name); LS.set(K.VSNAPSEL,vsnapSel);
+  renderRivals(); renderVendorCompare();
+}
+async function refreshOneRival(name){
+  const box=document.getElementById('rivalStatus');
+  const say=t=>{ if(box) box.innerHTML='<i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i>'+esc(t); };
+  try{
+    const res=await fetchVendor(name,RIVAL_PAGES,say);
+    vendorSnaps[name]=buildVendorSnap(name,res); persistVendorSnaps();
+    if(box) box.innerHTML='';
+    renderRivals(); renderVendorCompare();
+    toast(name+'：抓到 '+fmtNum(res.recs.length)+' 筆（官方共 '+fmtNum(res.total)+' 筆）','success');
+  }catch(e){
+    if(box) box.innerHTML='<span class="text-rose-600">'+esc(name)+' 更新失敗：'+esc(e.message)+'</span>';
+  }
+}
+async function refreshAllRivals(){
+  if(!rivals.length){ toast('追蹤清單是空的','warning'); return; }
+  const box=document.getElementById('rivalStatus');
+  const say=t=>{ if(box) box.innerHTML='<i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i>'+esc(t); };
+  let ok=0, fail=[];
+  for(const name of rivals){
+    try{ const res=await fetchVendor(name,RIVAL_PAGES,say);
+      vendorSnaps[name]=buildVendorSnap(name,res); ok++; }
+    catch(e){ fail.push(name); }
+    await new Promise(s=>setTimeout(s,RIVAL_PAGE_GAP));
+  }
+  persistVendorSnaps();
+  if(box) box.innerHTML='';
+  renderRivals(); renderVendorCompare();
+  toast('更新完成：'+ok+' 家'+(fail.length?('，'+fail.length+' 家失敗（'+fail.join('、')+'）'):''), fail.length?'warning':'success');
+}
+function toggleVsnapSel(name,on){
+  const i=vsnapSel.indexOf(name);
+  if(on && i<0){ if(vsnapSel.length>=4){ toast('一次最多對比 4 家','warning'); renderVendorCompare(); return; } vsnapSel.push(name); }
+  if(!on && i>=0) vsnapSel.splice(i,1);
+  LS.set(K.VSNAPSEL,vsnapSel); renderVendorCompare();
+}
+
+function renderRivals(){
+  const box=document.getElementById('rivalPanel'); if(!box) return;
+  let h='<div class="card p-5">'+
+    '<div class="eyebrow">RIVAL WATCH</div>'+
+    '<h3 class="font-bold text-ink-900 mt-1">對手常駐追蹤</h3>'+
+    '<p class="text-xs text-slate-500 mt-1">建一份對手清單，一鍵看它們最近得標什麼、在哪些機關、常跟誰合作。'+
+    '廠商查詢每頁 20 筆，這裡每家抓 '+RIVAL_PAGES+' 頁（'+(RIVAL_PAGES*20)+' 筆），所以呈現的是<strong>最近動態</strong>而非全歷史。</p>'+
+    '<div class="flex gap-2 mt-3">'+
+      '<input id="rivalInput" type="text" placeholder="輸入廠商名稱，例如：中興工程顧問" class="flex-1 px-3 py-2 border rounded-xl text-sm">'+
+      '<button onclick="addRival()" class="px-4 py-2 bg-jade-600 hover:bg-jade-700 text-white rounded-xl text-sm font-medium">加入</button>'+
+      (rivals.length?'<button onclick="refreshAllRivals()" class="px-3 py-2 border rounded-xl text-xs hover:bg-slate-50 whitespace-nowrap"><i class="fa-solid fa-rotate mr-1"></i>全部更新</button>':'')+
+    '</div>';
+
+  const notYet=RIVAL_SUGGEST.filter(x=>!rivals.some(r=>sameVendor(r,x)));
+  if(notYet.length){
+    h+='<div class="mt-2.5 flex flex-wrap gap-1.5 items-center">'+
+      '<span class="text-[11px] text-slate-400">常見工程顧問：</span>'+
+      notYet.map(x=>'<button onclick="addRival('+JSON.stringify(x)+')" class="tag bg-slate-100 hover:bg-jade-100 text-slate-600 hover:text-jade-700">+ '+esc(x)+'</button>').join('')+
+      '</div>';
+  }
+  h+='<div id="rivalStatus" class="text-xs text-jade-700 mt-2"></div>';
+
+  if(!rivals.length){
+    return void(box.innerHTML=h+'<p class="text-xs text-slate-400 mt-3">還沒有追蹤任何對手。加入後會自動去抓它最近的得標紀錄。</p></div>');
+  }
+
+  h+='<div class="mt-4 space-y-3">';
+  rivals.forEach(name=>{
+    const sn=vendorSnaps[name];
+    h+='<div class="rounded-xl border p-3">'+
+      '<div class="flex items-start justify-between gap-2 flex-wrap">'+
+        '<div class="min-w-0"><div class="text-sm font-bold text-ink-900">'+esc(name)+'</div>'+
+        (sn?('<div class="text-[11px] text-slate-500 mt-0.5">官方共 '+fmtNum(sn.total)+' 筆'+
+             (sn.tp?('（'+sn.tp+' 頁）'):'')+' · 已抓 '+fmtNum(sn.fetched)+' 筆 · 其中決標 '+fmtNum(sn.awards)+' 件 · 快照 '+
+             new Date(sn.at).toLocaleDateString('zh-TW')+'</div>')
+            :'<div class="text-[11px] text-slate-400 mt-0.5">還沒抓過</div>')+
+        '</div>'+
+        '<div class="flex gap-1.5 flex-shrink-0">'+
+          '<button onclick="refreshOneRival('+JSON.stringify(name)+')" class="px-2.5 py-1.5 text-[11px] border rounded-lg hover:bg-slate-50">更新</button>'+
+          '<button onclick="removeRival('+JSON.stringify(name)+')" class="px-2 py-1.5 text-[11px] text-slate-400 hover:text-rose-500">移除</button>'+
+        '</div>'+
+      '</div>';
+    if(sn){
+      if(sn.agencies.length){
+        h+='<div class="mt-2.5 grid sm:grid-cols-2 gap-3">'+
+          '<div><div class="text-[11px] font-semibold text-slate-600 mb-1">主要機關</div><div class="space-y-0.5">'+
+          sn.agencies.slice(0,4).map(([a,c])=>'<div class="flex justify-between text-[11px] gap-2"><span class="truncate text-slate-700">'+esc(vendorShort(a))+'</span><span class="font-bold text-jade-700 flex-shrink-0">'+c+'</span></div>').join('')+
+          '</div></div>'+
+          '<div><div class="text-[11px] font-semibold text-slate-600 mb-1">常見共同投標夥伴</div>'+
+          (sn.partners.length?('<div class="space-y-0.5">'+sn.partners.slice(0,4).map(([a,c])=>'<div class="flex justify-between text-[11px] gap-2"><span class="truncate text-slate-700">'+esc(a)+'</span><span class="font-bold text-slate-500 flex-shrink-0">'+c+'</span></div>').join('')+'</div>')
+                            :'<div class="text-[11px] text-slate-400">抓取範圍內沒有共同投標</div>')+
+          '</div></div>';
+      }
+      if(sn.recent.length){
+        h+='<details class="mt-2.5"><summary class="text-[11px] font-semibold text-slate-600 cursor-pointer">最近得標 '+sn.recent.length+' 筆</summary>'+
+          '<div class="mt-1.5 space-y-1.5">'+
+          sn.recent.map(r=>'<div class="text-[11px] border-l-2 border-jade-200 pl-2"><div class="text-ink-900 leading-snug">'+esc(r.ti)+'</div>'+
+            '<div class="text-slate-400 font-mono">'+fmtYmd(r.d)+' · '+esc(vendorShort(r.n))+'</div></div>').join('')+
+          '</div></details>';
+      }
+    }
+    h+='</div>';
+  });
+  h+='</div>';
+  box.innerHTML=h+'</div>';
+}
+
+const VSNAP_ROWS = [
+  ['官方總筆數',   s=>fmtNum(s.total), 'num'],
+  ['已抓取',       s=>fmtNum(s.fetched)+' 筆（'+s.pages+' / '+(s.tp||'?')+' 頁）', 'text'],
+  ['決標件數',     s=>fmtNum(s.awards), 'num'],
+  ['更正公告',     s=>fmtNum(s.corrections), 'num'],
+  ['涉及機關數',   s=>fmtNum(s.agencies.length), 'num'],
+  ['最大機關佔比', s=>{ const t=s.agencies.reduce((a,x)=>a+x[1],0); return (t&&s.agencies.length)?pct1(s.agencies[0][1]/t):'—'; }, 'high-bad'],
+  ['前三大機關',   s=>s.agencies.slice(0,3).map(x=>esc(vendorShort(x[0]))+'('+x[1]+')').join('<br>')||'—', 'text'],
+  ['共同投標夥伴數', s=>fmtNum(s.partners.length), 'num'],
+  ['前三大夥伴',   s=>s.partners.slice(0,3).map(x=>esc(x[0])+'('+x[1]+')').join('<br>')||'—', 'text'],
+  ['公告年份',     s=>s.years.length?(s.years[0][0]+'–'+s.years[s.years.length-1][0]):'—', 'text'],
+  ['快照時間',     s=>new Date(s.at).toLocaleString('zh-TW',{hour12:false}).replace(/:\d\d$/,''), 'text']
+];
+
+function renderVendorCompare(){
+  const box=document.getElementById('vendorCompare'); if(!box) return;
+  const names=Object.keys(vendorSnaps).sort((a,b)=>vendorSnaps[b].at-vendorSnaps[a].at);
+  if(names.length<2){ box.innerHTML=''; return; }
+  const sel=vsnapSel.filter(x=>vendorSnaps[x]);
+
+  let h='<details class="card p-0"'+(sel.length>=2?' open':'')+'>'+
+    '<summary class="p-4 cursor-pointer flex items-center justify-between flex-wrap gap-2">'+
+      '<div><div class="eyebrow">VENDOR COMPARE</div>'+
+      '<h3 class="font-bold text-ink-900 mt-1">廠商對比</h3>'+
+      '<p class="text-xs text-slate-500 mt-0.5">勾 2–4 家並排比。目前有 '+names.length+' 份廠商快照'+(sel.length?('，已勾 '+sel.length+' 家'):'')+'。</p></div>'+
+      '<i class="fa-solid fa-chevron-down text-slate-300"></i>'+
+    '</summary><div class="border-t p-4 space-y-4">'+
+    '<div class="flex flex-wrap gap-1.5">';
+  names.forEach(nm=>{
+    const on=sel.indexOf(nm)>=0;
+    h+='<label class="flex items-center gap-1.5 text-[11px] px-2 py-1.5 rounded-lg border cursor-pointer '+
+      (on?'bg-jade-50 border-jade-300 text-jade-800 font-semibold':'bg-white hover:bg-slate-50 text-slate-600')+'">'+
+      '<input type="checkbox" '+(on?'checked':'')+' onchange="toggleVsnapSel('+JSON.stringify(nm)+',this.checked)">'+
+      '<span>'+esc(nm)+'</span></label>';
+  });
+  h+='</div>';
+
+  if(sel.length<2){
+    return void(box.innerHTML=h+'<p class="text-xs text-slate-400">再勾一家就會出現對比表。</p></div></details>');
+  }
+
+  const snaps=sel.map(nm=>vendorSnaps[nm]);
+  // 機關重疊：抓取範圍內同時出現在多家對手名單上的機關
+  const agSets=snaps.map(s=>new Set(s.agencies.map(x=>x[0])));
+  const overlapAll=[...agSets[0]].filter(a=>agSets.every(st=>st.has(a)));
+
+  h+='<div class="overflow-x-auto"><table class="w-full text-xs border-collapse min-w-[520px]">'+
+    '<thead><tr><th class="p-2 text-left bg-slate-50 border sticky left-0 z-10">指標</th>';
+  snaps.forEach(s=>{ h+='<th class="p-2 text-left border bg-slate-50 align-top min-w-[140px]"><div class="font-bold text-ink-900 leading-snug">'+esc(s.name)+'</div></th>'; });
+  h+='</tr></thead><tbody>';
+  VSNAP_ROWS.forEach(([label,fn,kind])=>{
+    const vals=snaps.map(s=>{ try{ return fn(s); }catch(e){ return '—'; } });
+    if(vals.every(v=>v==='—')) return;
+    let best=-1;
+    if(kind==='num'||kind==='high-bad'){
+      const nums=snaps.map(s=>snapNum(fn(s)));
+      let bv=null; nums.forEach((v,i)=>{ if(v!=null&&(bv==null||v>bv)){ bv=v; best=i; } });
+    }
+    h+='<tr><td class="p-2 border bg-slate-50 font-semibold sticky left-0 z-10 align-top whitespace-nowrap">'+esc(label)+'</td>';
+    vals.forEach((v,i)=>{
+      const hi = i===best ? (kind==='high-bad'?'text-rose-600 font-bold':'text-jade-700 font-bold') : 'text-ink-900';
+      h+='<td class="p-2 border align-top '+hi+'">'+v+'</td>';
+    });
+    h+='</tr>';
+  });
+  h+='<tr><td class="p-2 border bg-slate-50 font-semibold sticky left-0 z-10 align-top whitespace-nowrap">共同機關</td>'+
+    '<td class="p-2 border align-top" colspan="'+snaps.length+'">'+
+    (overlapAll.length
+      ? '<span class="font-bold text-ink-900">'+overlapAll.length+' 個機關</span>這幾家都有得標：'+
+        overlapAll.slice(0,8).map(a=>'<span class="tag bg-amber-100 text-amber-800 ml-1">'+esc(vendorShort(a))+'</span>').join('')+
+        (overlapAll.length>8?('<span class="text-slate-400 ml-1">…另 '+(overlapAll.length-8)+' 個</span>'):'')
+      : '<span class="text-slate-400">抓取範圍內沒有共同的機關</span>')+
+    '</td></tr>';
+  h+='</tbody></table></div>'+
+    '<p class="text-[11px] text-slate-400 leading-relaxed">所有數字都只涵蓋<strong>已抓取的範圍</strong>（每家 '+RIVAL_PAGES+' 頁、'+(RIVAL_PAGES*20)+' 筆上限），'+
+    '「官方總筆數」才是全歷史。抓取筆數不同的兩家不能直接比件數，比例類與名單類才有意義。'+
+    '「共同投標夥伴」來自決標公告的得標廠商名單，所以只看得到<strong>一起得標</strong>的組合，一起投標但沒中的看不到。</p>';
+  box.innerHTML=h+'</div></details>';
+}
+
 async function doCompanySearch(){
   const q=document.getElementById('companyQuery').value.trim();
   if(!q){ toast('請輸入廠商名稱或統編','warning'); return; }
@@ -2194,8 +2556,8 @@ function dl(blob,name){ const u=URL.createObjectURL(blob); const a=document.crea
   document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(u),1000); }
 /* ================= 備份 ================= */
 function exportBackup(){
-  const data={version:4,exportedAt:new Date().toISOString(),
-    tracked,compare:compareList,watch:watchKeywords,agencies:agencyIndex};
+  const data={version:5,exportedAt:new Date().toISOString(),
+    tracked,compare:compareList,watch:watchKeywords,agencies:agencyIndex,rivals};
   dl(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),'標案參謀室備份_'+new Date().toISOString().slice(0,10)+'.json');
   toast('備份已下載','success');
 }
@@ -2207,6 +2569,7 @@ document.getElementById('backupInput').addEventListener('change',async e=>{
     if(Array.isArray(d.compare)){ compareList=d.compare; LS.set(K.COMPARE,compareList); }
     if(Array.isArray(d.watch)){ watchKeywords=d.watch; LS.set(K.WATCH,watchKeywords); renderWatchChips(); }
     if(d.agencies&&typeof d.agencies==='object'){ Object.assign(agencyIndex,d.agencies); persistAgencyIndex(); }
+    if(Array.isArray(d.rivals)){ d.rivals.forEach(x=>{ if(!rivals.some(y=>sameVendor(y,x))) rivals.push(x); }); LS.set(K.RIVALS,rivals); }
     updateCounters();
     toast('備份已匯入','success');
   }catch(err){ toast('匯入失敗：格式不對','error'); }
@@ -2224,6 +2587,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('liveKeyword').addEventListener('keydown',e=>{ if(e.key==='Enter') doLiveSearch(); });
   document.getElementById('watchInput').addEventListener('keydown',e=>{ if(e.key==='Enter') addWatchKeyword(); });
   document.getElementById('agencyFilter').addEventListener('keydown',e=>{ if(e.key==='Enter') renderAgencies(); });
+  document.getElementById('rivalPanel').addEventListener('keydown',e=>{
+    if(e.key==='Enter' && e.target && e.target.id==='rivalInput') addRival(); });
   renderWatchChips(); checkProxy(false);
   updateCounters(); renderOverview();
 });

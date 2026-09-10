@@ -5,8 +5,12 @@
  * <script> 抽出來，丟進 node:vm，配一組剛好夠用的 DOM 假物件執行，
  * 然後直接呼叫裡面的純函式。函式宣告會成為 vm context 的屬性，所以取得到。
  *
- * 這裡只測「算得對不對」的純邏輯（發包週期、流標重招、系列鍵正規化），
- * 不測畫面。畫面行為請用瀏覽器實際點。
+ * 這裡只測「算得對不對」的純邏輯（發包週期、流標重招、系列鍵正規化、
+ * 集中度、落標率、金額取值、廠商快照），不測畫面。畫面行為請用瀏覽器實際點。
+ *
+ * 注意跨 realm 的坑：函式在 vm 沙箱裡建立的物件／陣列，原型屬於沙箱的 realm，
+ * 所以 assert.deepEqual（strict 模式下即 deepStrictEqual）會因原型不符而失敗，
+ * 即使值一模一樣。比較這類回傳值請改用 JSON.stringify。
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -228,6 +232,89 @@ test('median 處理奇偶數與空陣列', () => {
   assert.equal(app.median([]), null);
 });
 
+test('sameVendor 認得同一家廠商的不同寫法', () => {
+  const f = app.sameVendor;
+  // 廠商查詢回傳的名稱可能帶英文後綴
+  assert.ok(f('中興工程顧問股份有限公司 (Sinotech Engineering Consultants, Ltd.)', '中興工程顧問'));
+  assert.ok(f('中興工程顧問股份有限公司', '中興工程顧問'));
+  assert.ok(f('中興工程顧問', '中興工程顧問股份有限公司'), '兩個方向都要成立');
+  assert.ok(!f('中興工程顧問', '台灣世曦工程顧問'));
+  assert.ok(!f('', '中興工程顧問'));
+  assert.ok(!f('中興工程顧問', ''));
+});
+
+test('isRealAward 只認真正的決標公告', () => {
+  const f = app.isRealAward;
+  assert.equal(f('決標公告'), true);
+  assert.equal(f('更正決標公告'), false, '更正不能重複計入');
+  assert.equal(f('無法決標公告'), false);
+  assert.equal(f('更正無法決標公告'), false);
+  assert.equal(f('定期彙送'), false);
+  assert.equal(f('公開招標公告'), false);
+  assert.equal(f(''), false);
+});
+
+test('buildVendorSnap 算出決標件數、機關分布與共同投標夥伴', () => {
+  const SELF1 = '中興工程顧問股份有限公司 (Sinotech Engineering Consultants, Ltd.)';
+  const SELF2 = '中興工程顧問股份有限公司';
+  const PARTNER = '杜風工程顧問有限公司';
+  const mk = (t, agency, names) => ({ u:'U', n:agency, d:'20260301', j:'J', t, ti:'案', c:names });
+  const recs = [
+    mk('決標公告','台北市政府',[SELF1, SELF2, PARTNER]),   // 自己出現兩種寫法 + 一個夥伴
+    mk('決標公告','台北市政府',[SELF2]),
+    mk('決標公告','新北市政府',[SELF2, PARTNER]),
+    mk('更正決標公告','台北市政府',[SELF2]),                // 不算決標
+    mk('更正無法決標公告','台北市政府',[]),                  // 不算決標
+    mk('定期彙送','雜訊機關',[]),                            // 不算決標
+    mk('無法決標公告','台北市政府',[])                       // 不算決標
+  ];
+  const sn = app.buildVendorSnap('中興工程顧問', { recs, total:4681, tp:47, pages:3 });
+  assert.equal(sn.awards, 3, '只有 3 筆真決標');
+  assert.equal(sn.corrections, 2, '更正決標與更正無法決標都算更正');
+  assert.equal(sn.fetched, 7);
+  assert.equal(sn.total, 4681);
+  // 跨 realm：用 JSON 比較，不用 deepEqual（見檔頭說明）
+  assert.equal(JSON.stringify(sn.agencies), JSON.stringify([['台北市政府',2],['新北市政府',1]]),
+    '機關統計只看真決標');
+  assert.equal(JSON.stringify(sn.partners), JSON.stringify([[PARTNER,2]]),
+    '自己不可被算成夥伴，且同一案只算一次');
+  assert.ok(sn.partners.every(x => x[0].indexOf('中興') < 0), '含英文後綴的自己也要排除');
+});
+
+test('gateBlock 標出投標門檻，沒門檻時明說沒有', () => {
+  const demanding = {
+    '招標資料:是否屬統包':'是',
+    '招標資料:是否應依公共工程專業技師簽證規則實施技師簽證':'是',
+    '招標資料:是否屬特殊採購':'是',
+    '招標資料:決標方式':'最低標',
+    '招標資料:是否訂有底價':'否',
+    '採購資料:是否適用條約或協定之採購:是否適用WTO政府採購協定(GPA)':'是',
+    '領投標資料:是否須繳納押標金:押標金額度':'標價之百分之五',
+    '領投標資料:是否須繳納履約保證金':'是'
+  };
+  const h = app.gateBlock(demanding);
+  assert.match(h, /8 項需要留意/);
+  assert.match(h, /統包，需設計與施工整合/);
+  assert.match(h, /須依技師簽證規則辦理/);
+  assert.match(h, /以價格競爭為主/);
+  assert.match(h, /未訂底價/);
+  assert.match(h, /外商可參與/);
+  assert.match(h, /須繳押標金/);
+  assert.match(h, /須繳履約保證金/);
+
+  const easy = {
+    '招標資料:是否屬統包':'否',
+    '招標資料:是否應依公共工程專業技師簽證規則實施技師簽證':'否',
+    '招標資料:決標方式':'最有利標',
+    '招標資料:是否訂有底價':'是',
+    '領投標資料:是否須繳納押標金':'否',
+    '領投標資料:是否須繳納履約保證金':'否'
+  };
+  assert.match(app.gateBlock(easy), /沒有額外門檻/);
+  assert.equal(app.gateBlock(null), '');
+  assert.equal(app.gateBlock({}), '');
+});
+
 test('pickMoney 不會被「是否公開」與 remind 說明騙走（實測踩到的 bug）', () => {
   // 這是真實的決標公告 detail 鍵順序：「是否公開」排在金額前面。
   // 原本用 pick() 子字串比對會先撞到它，parseMoney('是') = 0，
@@ -334,7 +421,7 @@ test('debarredList 抓出停權公告並保留各廠商', () => {
   assert.equal(list[0].date, '20260107', '應依日期新到舊');
   assert.equal(list[0].correction, true, '更正公告要標記');
   assert.equal(list[2].correction, false);
-  assert.deepEqual(list[1].vendors, ['乙公司']);
+  assert.equal(JSON.stringify(list[1].vendors), JSON.stringify(['乙公司']));
 });
 
 test('snapNum 抽數字時要先去掉千分位（否則 1,200 會輸給 999）', () => {
