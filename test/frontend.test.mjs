@@ -232,11 +232,49 @@ test('median 處理奇偶數與空陣列', () => {
   assert.equal(app.median([]), null);
 });
 
-test('searchEndpoint 對應三種查詢模式', () => {
-  assert.equal(app.searchEndpoint('title'), 'searchbytitle');
-  assert.equal(app.searchEndpoint('company'), 'searchbycompanyname');
-  assert.equal(app.searchEndpoint('companyid'), 'searchbycompanyid');
-  assert.equal(app.searchEndpoint(''), 'searchbytitle', '預設走標案名稱');
+test('pickDriver 依選擇性挑主查詢：統編 › 廠商名稱 › 標案名稱', () => {
+  const f = app.pickDriver;
+  // API 一次只能用一個條件查，所以要挑選擇性最高的當主查詢
+  assert.equal(f({vid:'12345678', vendor:'中興', title:'統包'}), 'vid', '統編最精確');
+  assert.equal(f({vendor:'中興', title:'統包'}), 'vendor');
+  assert.equal(f({title:'統包'}), 'title');
+  // 機關不能當主查詢——API 沒有機關查詢端點
+  assert.equal(f({agency:'台灣電力'}), null, '只填機關時沒有可用的主查詢');
+  assert.equal(f({agency:'台灣電力', title:'統包'}), 'title', '機關只能當前端篩選');
+  assert.equal(f({}), null);
+  assert.equal(f(null), null);
+});
+
+test('driverEndpoint 對應到正確的 API 端點', () => {
+  assert.equal(app.driverEndpoint('title'), 'searchbytitle');
+  assert.equal(app.driverEndpoint('vendor'), 'searchbycompanyname');
+  assert.equal(app.driverEndpoint('vid'), 'searchbycompanyid');
+  assert.equal(app.driverEndpoint('agency'), null, '機關沒有對應端點');
+  assert.equal(app.driverEndpoint(null), null);
+});
+
+test('applyConds 四個條件是 AND，且不複篩主查詢欄位', () => {
+  const mk = (agency,title,names,ids) =>
+    ({ unit_name:agency, brief:{ type:'決標公告', title, companies:{ names, ids } } });
+  const recs = [
+    mk('台灣電力股份有限公司大林發電廠','#1機統包工程',['中興工程顧問股份有限公司'],['12345678']),
+    mk('台灣電力股份有限公司大林發電廠','例行維護工作',['中興工程顧問股份有限公司'],['12345678']),
+    mk('台灣中油股份有限公司','#2機統包工程',['中興工程顧問股份有限公司'],['12345678']),
+    mk('台灣電力股份有限公司大林發電廠','#3機統包工程',['別家工程有限公司'],['87654321'])
+  ];
+  const c = { title:'統包', agency:'台灣電力', vendor:'中興', vid:'' };
+  // 四個條件同時成立，只有第 1 筆
+  assert.equal(app.applyConds(recs, c, null).length, 1);
+  assert.equal(app.applyConds(recs, c, null)[0].brief.title, '#1機統包工程');
+
+  // skip 主查詢欄位：伺服器已比對過，不再複篩（免得比伺服器更嚴而誤刪）
+  const skipped = app.applyConds(recs, c, 'title');
+  assert.equal(skipped.length, 2, '跳過標案名稱後，大林+中興的兩筆都留下');
+
+  // 統編條件
+  assert.equal(app.applyConds(recs, {vid:'87654321'}, null).length, 1);
+  // 沒有任何條件 → 原樣回傳
+  assert.equal(app.applyConds(recs, {}, null).length, 4);
 });
 
 test('matchAgencies 從機關索引比對，短名稱（上層機關）排前面', () => {
