@@ -308,6 +308,7 @@ tailwind.config = { theme: { extend: { colors: {
           <button onclick="renderAgencies()" class="px-4 py-2 bg-jade-600 text-white rounded-xl text-sm font-medium">篩選</button>
         </div>
       </div>
+      <div id="agencyCompare" class="mb-4"></div>
       <div id="agencyDetail" class="hidden space-y-4 mb-4"></div>
       <div id="agencyList" class="space-y-2"></div>
     </section>
@@ -387,7 +388,8 @@ const LS = {
 const K = { BASE:'pi_api_base', TOKEN:'pi_api_token',
   DAYCACHE:'pi_daycache', TRACKED:'pi_tracked', COMPARE:'pi_compare',
   PROXY:'pi_proxy_base', WATCH:'pi_watch_keywords', AMOUNT:'pi_amount_cache',
-  AGENCY:'pi_agency_index', CMPVIEW:'pi_compare_view' };
+  AGENCY:'pi_agency_index', CMPVIEW:'pi_compare_view',
+  SNAP:'pi_agency_snap', SNAPSEL:'pi_agency_snap_sel' };
 
 /* pcc-viewer 公開設定檔裡的那組 token 已被 API 端擋掉（回 403）。
    openfun 這支 API 目前不帶 token 也能公開查詢，所以預設不送 Authorization。
@@ -405,6 +407,8 @@ let compareList   = LS.get(K.COMPARE, []);
 let watchKeywords = LS.get(K.WATCH, []);
 let amountCache   = LS.get(K.AMOUNT, {});   // 'unit_id|job_number' -> {a:決標金額, d:決標日期, b:預算}
 let agencyIndex   = LS.get(K.AGENCY, {});   // 機關名 -> unit_id；累積式，不隨公告快取一起被裁掉
+let agencySnaps   = LS.get(K.SNAP, {});    // unit_id -> 機關指標快照，供機關對比用
+let snapSel       = LS.get(K.SNAPSEL, []); // 目前勾選要對比的 unit_id
 let proxyOk       = false;
 let currentTender = null;
 let calCursor     = new Date();
@@ -448,6 +452,48 @@ function pick(detail, keys){
   if(!detail) return '';
   for(const key of keys){ for(const k of Object.keys(detail)){ if(k.indexOf(key)>=0 && detail[k]) return String(detail[k]); } }
   return '';
+}
+
+/* 金額欄位不能用 pick()，有兩個實測踩到的陷阱：
+   1. 「預算金額」旁邊有「預算金額是否公開」，值是「是」／「否」。pick() 用子字串比對，
+      而決標公告的鍵順序是「已公告資料:預算金額是否公開」在「已公告資料:預算金額」之前，
+      所以 pick 先撞到「是」，parseMoney('是') = 0。後果：落標率與「決標／預算比」
+      永遠算不出來，而且打開決標公告的標案詳情時「採購預算」會顯示「是」。
+   2. 「總決標金額」旁邊有「總決標金額:remind」（一段中文說明，無數字）與
+      「投標廠商:投標廠商N:決標金額」（單一廠商金額，不是總額）。pick 會落到後者。
+   所以：先比對鍵的最後一段是否完全相符、跳過說明類欄位、值一定要能解析成正數。 */
+function budgetStr(detail,records){
+  const v=pickMoney(detail,['預算金額']);
+  const w=(v!=null)?v:pickMoneyAcross(records,['預算金額']);
+  return w!=null?String(w):'';
+}
+const MONEY_BAD_KEY = /是否|remind|說明|備註|理由|方式|條件/;
+function pickMoney(detail, keys){
+  if(!detail) return null;
+  const ks=Object.keys(detail);
+  for(const key of keys){                    // 第一輪：鍵尾完全相符
+    for(const k of ks){
+      if(MONEY_BAD_KEY.test(k)) continue;
+      if(k.slice(k.lastIndexOf(':')+1)!==key) continue;
+      const v=parseMoney(detail[k]); if(v>0) return v;
+    }
+  }
+  for(const key of keys){                    // 第二輪：退回子字串，仍跳過說明類
+    for(const k of ks){
+      if(MONEY_BAD_KEY.test(k)) continue;
+      if(k.indexOf(key)<0) continue;
+      const v=parseMoney(detail[k]); if(v>0) return v;
+    }
+  }
+  return null;
+}
+/* 在整個標案的所有公告紀錄裡找金額：由新到舊，決標公告找不到就回頭看招標公告 */
+function pickMoneyAcross(records, keys){
+  for(const r of (records||[]).slice().reverse()){
+    const v=pickMoney(r&&r.detail, keys);
+    if(v!=null) return v;
+  }
+  return null;
 }
 
 /* ================= API ================= */
@@ -774,7 +820,7 @@ async function openTender(unit_id,job_number,unit_name,title){
     const detail=last.detail||{};
     currentTender={ unit_id, job_number, unit_name:r.unit_name||unit_name||'', title:(last.brief&&last.brief.title)||title||'',
       date:last.date, type:(last.brief&&last.brief.type)||'',
-      deadline:pick(detail,['截止投標','投標截止']), budget:pick(detail,['預算金額']), detail, records };
+      deadline:pick(detail,['截止投標','投標截止']), budget:budgetStr(detail,records), detail, records };
     document.getElementById('tmUnit').textContent=currentTender.unit_name;
     document.getElementById('tmTitle').textContent=currentTender.title;
     if(noteAgency(unit_id,currentTender.unit_name)) persistAgencyIndex();
@@ -890,6 +936,7 @@ function searchAgencyByTitle(){
 }
 
 function renderAgencies(){
+  renderAgencyCompare();
   const filter=(document.getElementById('agencyFilter').value||'').trim();
   const box=document.getElementById('agencyList');
   const recs=cacheRecords();
@@ -1109,6 +1156,68 @@ function vendorStats(recs){
   return Object.values(map);
 }
 
+function medianF(arr){ if(!arr.length) return null;
+  const a=arr.slice().sort((x,y)=>x-y), m=a.length>>1;
+  return a.length%2 ? a[m] : (a[m-1]+a[m])/2; }
+function pct1(v){ return v==null?'—':(v*100).toFixed(1)+'%'; }
+
+/* ---------- 廠商集中度 ----------
+   以件數佔比算 CR1／CR3／CR5 與 HHI（各家佔比百分比的平方和，0–10000）。
+   分級用競爭法常見門檻：<1500 分散、1500–2500 中度集中、>2500 高度集中。
+   注意共同投標／複數決標的案子會同時計入每一家，所以件數總和會大於案件數，
+   集中度因此略被低估——畫面上要講明。 */
+function concentration(vs){
+  const n=vs.length; if(!n) return null;
+  const totalCount=vs.reduce((s,v)=>s+v.count,0); if(!totalCount) return null;
+  const sorted=vs.slice().sort((a,b)=>b.count-a.count);
+  const share=v=>v.count/totalCount;
+  const cr=k=>sorted.slice(0,k).reduce((s,v)=>s+share(v),0);
+  const hhi=Math.round(vs.reduce((s,v)=>s+Math.pow(share(v)*100,2),0));
+  const band = hhi<1500 ? {label:'分散',tone:'jade'}
+             : hhi<2500 ? {label:'中度集中',tone:'amber'}
+                        : {label:'高度集中',tone:'rose'};
+  return { vendors:n, totalCount, cr1:cr(1), cr3:cr(3), cr5:cr(5), hhi,
+           band:band.label, tone:band.tone, top:sorted.slice(0,5) };
+}
+
+/* ---------- 落標率（決標金額 / 預算金額） ----------
+   只算 amountCache 裡同時有決標金額與預算金額的決標案，所以樣本數必須一起顯示。
+   比值 >3 或 <=0 視為異常剔除（多半是複數決標的總額對上單項預算）。 */
+function bidRatios(recs){
+  const rows=[];
+  recs.forEach(r=>{
+    if(!isAwardRec(r)) return;
+    const c=amountCache[amtKey(r.job_number)];
+    if(!c||!c.a||!c.b) return;
+    const ratio=c.a/c.b;
+    if(!(ratio>0) || ratio>3) return;
+    rows.push({ job:r.job_number, title:(r.brief&&r.brief.title)||'', date:r.date,
+                award:c.a, budget:c.b, ratio, year:String(r.date||'').slice(0,4) });
+  });
+  return rows;
+}
+function ratioStats(rows){
+  if(!rows.length) return null;
+  const rs=rows.map(x=>x.ratio);
+  const buckets=[['< 70%',0,0.70],['70–80%',0.70,0.80],['80–90%',0.80,0.90],
+                 ['90–95%',0.90,0.95],['95–100%',0.95,1.0],['≥ 100%',1.0,Infinity]];
+  const dist=buckets.map(([label,lo,hi])=>[label,rows.filter(x=>x.ratio>=lo&&x.ratio<hi).length]);
+  const byYear={}; rows.forEach(x=>{ if(x.year) (byYear[x.year]=byYear[x.year]||[]).push(x.ratio); });
+  const years=Object.keys(byYear).sort().map(y=>({year:y,n:byYear[y].length,med:medianF(byYear[y])}));
+  const sortedRows=rows.slice().sort((a,b)=>a.ratio-b.ratio);
+  return { n:rows.length, median:medianF(rs), dist, years,
+           lowest:sortedRows.slice(0,5), highest:sortedRows.slice(-5).reverse() };
+}
+
+/* ---------- 拒絕往來廠商（停權名單） ----------
+   政府採購的廠商拒絕往來公告。同一案同一天可能有多則，一家廠商一則。 */
+function debarredList(recs){
+  return recs.filter(r=>recTy(r).indexOf('拒絕往來')>=0)
+    .map(r=>({ date:r.date, title:(r.brief&&r.brief.title)||'', job:r.job_number,
+               vendors:recVendors(r), correction:recTy(r).indexOf('更正')>=0 }))
+    .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+}
+
 function coverageBanner(){
   const c=agencyCoverage();
   if(!c || c.complete) return '';
@@ -1200,9 +1309,13 @@ function renderAgencyDetail(){
     '</div>'+
   '</div>'+
 
+  ratioBlock()+
+  debarredBlock()+
   rhythmBlock();
 
+  saveAgencySnapshot();
   renderVendorRank();
+  renderAgencyCompare();
 }
 /* ---------- 發包節奏：週期預測與流標重招 ----------
    全部只用 unitData.records（機關全期間公告清單）計算，不額外打 API。
@@ -1300,6 +1413,250 @@ function buildFailed(recs){
 
 function fmtYmd(s){ s=String(s||''); return s.length===8?(s.slice(0,4)+'/'+s.slice(4,6)+'/'+s.slice(6)):s; }
 function fmtDateObj(d){ return d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0'); }
+
+function ratioBlock(){
+  const per=unitPeriodRecords();
+  const awards=per.filter(isAwardRec);
+  const rows=bidRatios(per);
+  const st=ratioStats(rows);
+  let h='<div class="card p-5">'+
+    '<div class="eyebrow">BID RATIO</div>'+
+    '<h3 class="font-bold text-ink-900 mt-1">落標率（決標金額 ÷ 預算金額）</h3>'+
+    '<p class="text-xs text-slate-500 mt-1">判斷這個機關的案子要壓到幾折才會中。只能算<strong>同時有決標金額與預算金額</strong>的案子，所以樣本數很重要。</p>';
+  if(!st){
+    return h+'<div class="mt-4 flex items-center gap-2 flex-wrap text-xs bg-amber-50 border border-amber-100 rounded-xl p-3">'+
+      '<i class="fa-solid fa-coins text-amber-600"></i>'+
+      '<span class="text-amber-800">還沒有可用樣本。公告清單不含金額，要逐案抓才有——按上方廠商排行的「補齊決標金額」。</span>'+
+      '</div></div>';
+  }
+  const cov=awards.length? Math.round(st.n/awards.length*100) : 0;
+  h+='<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">'+
+    '<div class="rounded-xl bg-ink-900 text-white p-3"><div class="text-xl font-bold">'+pct1(st.median)+'</div><div class="text-[11px] text-white/50 mt-0.5">落標率中位數</div></div>'+
+    '<div class="rounded-xl bg-slate-50 border p-3"><div class="text-xl font-bold text-ink-900">'+fmtNum(st.n)+'</div><div class="text-[11px] text-slate-500 mt-0.5">樣本數（'+cov+'% 決標案）</div></div>'+
+    '<div class="rounded-xl bg-slate-50 border p-3"><div class="text-xl font-bold text-ink-900">'+pct1(st.lowest[0].ratio)+'</div><div class="text-[11px] text-slate-500 mt-0.5">最低一案</div></div>'+
+    '<div class="rounded-xl bg-slate-50 border p-3"><div class="text-xl font-bold text-ink-900">'+pct1(st.highest[0].ratio)+'</div><div class="text-[11px] text-slate-500 mt-0.5">最高一案</div></div>'+
+    '</div>';
+  h+='<div class="grid lg:grid-cols-2 gap-5 mt-5">'+
+    '<div>'+distBlock('落標率分佈（'+fmtNum(st.n)+' 案）', st.dist.filter(r=>r[1]), 8)+'</div>'+
+    '<div><div class="text-xs font-semibold text-slate-600 mb-2">逐年中位數</div>'+
+      (st.years.length?('<table class="w-full text-xs"><tbody>'+
+        st.years.slice().reverse().map(y=>'<tr class="border-b last:border-0"><td class="py-1.5 font-mono text-slate-500">'+esc(y.year)+'</td>'+
+          '<td class="py-1.5 text-right font-bold text-ink-900">'+pct1(y.med)+'</td>'+
+          '<td class="py-1.5 text-right text-[11px] text-slate-400">'+y.n+' 案</td></tr>').join('')+
+        '</tbody></table>'):'<p class="text-xs text-slate-400">沒有可分年的樣本。</p>')+
+    '</div></div>';
+  h+='<details class="mt-4 border rounded-xl"><summary class="p-2.5 text-xs font-semibold cursor-pointer text-slate-600">壓最低的 5 案（可看它們是什麼性質的工作）</summary>'+
+     '<div class="border-t divide-y">'+
+     st.lowest.map(x=>'<div class="p-2.5 text-xs"><div class="font-semibold text-ink-900 leading-snug">'+esc(x.title)+'</div>'+
+       '<div class="text-[11px] text-slate-500 mt-0.5">'+fmtYmd(x.date)+' · 預算 '+fmtWan(x.budget)+' → 決標 '+fmtWan(x.award)+
+       ' · <strong class="text-rose-600">'+pct1(x.ratio)+'</strong></div></div>').join('')+
+     '</div></details>';
+  h+='<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">比值超過 3 倍或非正數的已剔除（多半是複數決標的總額對上單項預算）。'+
+     '樣本涵蓋率低的時候中位數會偏——它只代表<strong>你已經補齊金額的那些案子</strong>，而不是這個機關的全貌。'+
+     '≥100% 的案子通常是決標金額含後續擴充或變更設計。</p>';
+  return h+'</div>';
+}
+
+function debarredBlock(){
+  const list=debarredList(unitData.records);
+  if(!list.length) return '';
+  // 交叉比對：被停權的廠商裡，有哪些同時也在這個機關的得標名單上
+  const winners={}; vendorStats(unitData.records).forEach(v=>{ winners[v.name]=v.count; });
+  const names=new Set(); list.forEach(x=>x.vendors.forEach(v=>names.add(v)));
+  const alsoWon=[...names].filter(v=>winners[v]).map(v=>({name:v,count:winners[v]}))
+                          .sort((a,b)=>b.count-a.count);
+  let h='<div class="card p-5">'+
+    '<div class="eyebrow">DEBARRED VENDORS</div>'+
+    '<h3 class="font-bold text-ink-900 mt-1">拒絕往來廠商（停權名單）</h3>'+
+    '<p class="text-xs text-slate-500 mt-1">這個機關公告過的廠商拒絕往來名單，共 <strong>'+list.length+'</strong> 則、涉及 <strong>'+names.size+'</strong> 家。查對手或潛在協力廠商有沒有被停權時可以看這裡。</p>';
+  if(alsoWon.length){
+    h+='<div class="mt-3 rounded-xl bg-rose-50 border border-rose-100 p-3">'+
+      '<div class="text-[11px] font-bold text-rose-700 mb-1.5"><i class="fa-solid fa-circle-exclamation mr-1"></i>其中 '+alsoWon.length+' 家同時也在本機關的得標名單上</div>'+
+      '<div class="flex flex-wrap gap-1.5">'+
+      alsoWon.slice(0,12).map(v=>'<span class="tag bg-white border border-rose-200 text-rose-700">'+esc(vendorShort(v.name))+' · '+v.count+' 件</span>').join('')+
+      '</div></div>';
+  }
+  h+='<div class="mt-3 space-y-2 max-h-96 overflow-y-auto">'+
+    list.slice(0,40).map(x=>'<div class="rounded-xl border p-3">'+
+      '<div class="flex justify-between gap-3 flex-wrap">'+
+        '<div class="min-w-0 flex-1">'+
+          '<div class="text-sm font-semibold text-ink-900 leading-snug">'+
+            (x.vendors.length? x.vendors.map(v=>esc(vendorShort(v))).join('、') : '（公告未列廠商）')+'</div>'+
+          '<div class="text-[11px] text-slate-500 mt-0.5">'+esc(x.title)+'</div>'+
+        '</div>'+
+        '<div class="text-[11px] text-slate-400 whitespace-nowrap self-center font-mono">'+fmtYmd(x.date)+
+          (x.correction?' <span class="tag bg-amber-100 text-amber-800">更正</span>':'')+'</div>'+
+      '</div></div>').join('')+
+    '</div>'+
+    (list.length>40?('<p class="text-[11px] text-slate-400 mt-2">另有 '+(list.length-40)+' 則未顯示。</p>'):'')+
+    '<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">同一案同一天可能有多則公告（一家廠商一則）。名單有「更正公告」代表原公告被修正過，'+
+    '這裡不會自動抵銷——要確認廠商目前的停權狀態，請到工程會的政府電子採購網查「拒絕往來廠商」專區。</p>';
+  return h+'</div>';
+}
+
+/* ---------- 機關快照與機關對比 ----------
+   機關輪廓要向 API 抓幾萬則公告才算得出來，不可能為了對比而同時抓兩三個機關。
+   所以每次看完一個機關就存一份「指標快照」（只存算好的數字，不存原始公告），
+   之後就能把看過的機關並排比較。快照會記錄當時的資料涵蓋範圍，
+   涵蓋率差很多的兩個機關不能直接比——表格裡會標出來。 */
+const SNAP_MAX = 40;
+
+function saveAgencySnapshot(){
+  if(!unitData) return;
+  const all=unitData.records;
+  const awards=all.filter(isAwardRec);
+  const tenders=all.filter(isTenderRec);
+  const fails=all.filter(r=>recTy(r).indexOf('無法決標')>=0 && recTy(r).indexOf('更正')<0);
+  const vs=vendorStats(all);
+  const con=concentration(vs);
+  const st=ratioStats(bidRatios(all));
+  const series=buildSeries(all);
+  const cov=agencyCoverage();
+  const ds=all.map(recDate).filter(Boolean).sort((a,b)=>a-b);
+  const decided=awards.length+fails.length;
+  agencySnaps[unitData.unit_id]={
+    unit_id:unitData.unit_id, unit_name:unitData.unit_name, at:Date.now(),
+    got:cov.got, total:cov.total, pf:cov.pf, tp:cov.tp, complete:cov.complete,
+    awards:awards.length, tenders:tenders.length, fails:fails.length,
+    failRate: decided? fails.length/decided : null,
+    vendors: con?con.vendors:0, cr1:con?con.cr1:null, cr3:con?con.cr3:null,
+    hhi:con?con.hhi:null, band:con?con.band:null,
+    ratioMed: st?st.median:null, ratioN: st?st.n:0,
+    seriesReg: series.filter(x=>x.regular).length,
+    seriesIrr: series.filter(x=>!x.regular).length,
+    soon120: series.filter(x=>x.regular&&x.daysToNext>=-30&&x.daysToNext<=120).length,
+    debarred: debarredList(all).length,
+    from: ds.length?ds[0].getFullYear():null, to: ds.length?ds[ds.length-1].getFullYear():null,
+    top3: (con?con.top.slice(0,3):[]).map(v=>vendorShort(v.name)+'('+v.count+')')
+  };
+  const ids=Object.keys(agencySnaps);
+  if(ids.length>SNAP_MAX){
+    ids.sort((a,b)=>agencySnaps[a].at-agencySnaps[b].at)
+       .slice(0,ids.length-SNAP_MAX).forEach(id=>delete agencySnaps[id]);
+  }
+  LS.set(K.SNAP,agencySnaps);
+}
+
+function toggleSnapSel(id,on){
+  const i=snapSel.indexOf(id);
+  if(on && i<0){ if(snapSel.length>=4){ toast('一次最多對比 4 個機關','warning'); renderAgencyCompare(); return; } snapSel.push(id); }
+  if(!on && i>=0) snapSel.splice(i,1);
+  LS.set(K.SNAPSEL,snapSel); renderAgencyCompare();
+}
+function dropSnap(id){
+  delete agencySnaps[id]; LS.set(K.SNAP,agencySnaps);
+  snapSel=snapSel.filter(x=>x!==id); LS.set(K.SNAPSEL,snapSel);
+  renderAgencyCompare();
+}
+function clearSnaps(){
+  if(!confirm('清掉所有機關快照？下次看機關輪廓時會重新產生。')) return;
+  agencySnaps={}; snapSel=[]; LS.set(K.SNAP,agencySnaps); LS.set(K.SNAPSEL,snapSel);
+  renderAgencyCompare();
+}
+
+/* 從一格顯示值裡抽出可比較的數字。fmtNum 會加千分位，不先去掉逗號的話
+   "1,200" 會被讀成 1 而輸給 "999"。也要先去掉 HTML 標籤（有些格帶 <span>）。 */
+function snapNum(raw){
+  if(raw==null) return null;
+  const m=String(raw).replace(/<[^>]*>/g,'').replace(/,/g,'').match(/-?[\d.]+/);
+  if(!m) return null;
+  const v=parseFloat(m[0]);
+  return isNaN(v)?null:v;
+}
+
+const SNAP_ROWS = [
+  ['資料涵蓋',   s=>s.total? (fmtNum(s.got)+' / '+fmtNum(s.total)+'（'+Math.round(s.got/s.total*100)+'%）') : fmtNum(s.got), 'text'],
+  ['抓到頁數',   s=>s.pf+' / '+s.tp+(s.complete?'（完整）':'（未抓完）'), 'text'],
+  ['公告年份',   s=>(s.from&&s.to)?(s.from+'–'+s.to):'—', 'text'],
+  ['招標公告',   s=>fmtNum(s.tenders), 'num'],
+  ['決標紀錄',   s=>fmtNum(s.awards), 'num'],
+  ['無法決標',   s=>fmtNum(s.fails), 'num'],
+  ['流標率',     s=>pct1(s.failRate), 'high-bad'],
+  ['得標廠商家數', s=>fmtNum(s.vendors), 'num'],
+  ['最大一家佔比', s=>pct1(s.cr1), 'high-bad'],
+  ['前三大佔比',  s=>pct1(s.cr3), 'high-bad'],
+  ['HHI 集中度',  s=>s.hhi!=null?(fmtNum(s.hhi)+'（'+s.band+'）'):'—', 'high-bad'],
+  ['落標率中位數', s=>s.ratioMed!=null?(pct1(s.ratioMed)+' <span class="text-[10px] text-slate-400">'+s.ratioN+' 案</span>'):'—（金額未補齊）', 'text'],
+  ['規律發包系列', s=>fmtNum(s.seriesReg)+' <span class="text-[10px] text-slate-400">+'+s.seriesIrr+' 不規律</span>', 'text'],
+  ['120 日內預估招標', s=>fmtNum(s.soon120), 'num'],
+  ['拒絕往來公告', s=>fmtNum(s.debarred), 'num'],
+  ['前三大廠商',  s=>s.top3&&s.top3.length?s.top3.map(esc).join('<br>'):'—', 'text'],
+  ['快照時間',    s=>new Date(s.at).toLocaleString('zh-TW',{hour12:false}).replace(/:\d\d$/,''), 'text']
+];
+
+function renderAgencyCompare(){
+  const box=document.getElementById('agencyCompare'); if(!box) return;
+  const ids=Object.keys(agencySnaps).sort((a,b)=>agencySnaps[b].at-agencySnaps[a].at);
+  if(!ids.length){ box.innerHTML=''; return; }
+  const sel=snapSel.filter(id=>agencySnaps[id]);
+
+  let h='<details class="card p-0"'+(sel.length>=2?' open':'')+'>'+
+    '<summary class="p-4 cursor-pointer flex items-center justify-between flex-wrap gap-2">'+
+      '<div><div class="eyebrow">AGENCY COMPARE</div>'+
+      '<h3 class="font-bold text-ink-900 mt-1">機關對比</h3>'+
+      '<p class="text-xs text-slate-500 mt-0.5">看過的機關會自動存一份指標快照，勾 2–4 個就能並排比。目前有 '+ids.length+' 個快照'+(sel.length?('，已勾 '+sel.length+' 個'):'')+'。</p></div>'+
+      '<i class="fa-solid fa-chevron-down text-slate-300"></i>'+
+    '</summary>'+
+    '<div class="border-t p-4 space-y-4">';
+
+  h+='<div class="flex flex-wrap gap-1.5 items-center">';
+  ids.forEach(id=>{
+    const sn=agencySnaps[id], on=sel.indexOf(id)>=0;
+    h+='<label class="flex items-center gap-1.5 text-[11px] px-2 py-1.5 rounded-lg border cursor-pointer '+
+      (on?'bg-jade-50 border-jade-300 text-jade-800 font-semibold':'bg-white hover:bg-slate-50 text-slate-600')+'">'+
+      '<input type="checkbox" '+(on?'checked':'')+' onchange="toggleSnapSel('+JSON.stringify(id)+',this.checked)">'+
+      '<span>'+esc(vendorShort(sn.unit_name))+'</span>'+
+      '<span class="text-slate-400">'+fmtNum(sn.got)+' 則</span>'+
+      '<span onclick="event.preventDefault();event.stopPropagation();dropSnap('+JSON.stringify(id)+')" class="text-slate-300 hover:text-rose-500 ml-0.5" title="刪除這份快照">✕</span>'+
+      '</label>';
+  });
+  h+='<button onclick="clearSnaps()" class="text-[11px] text-slate-400 hover:text-rose-500 underline ml-1">全部清掉</button></div>';
+
+  if(sel.length<2){
+    h+='<p class="text-xs text-slate-400">再勾一個機關就會出現對比表。快照是看機關輪廓時自動存的，想加新機關就去點它一次。</p>';
+    return void(box.innerHTML=h+'</div></details>');
+  }
+
+  const snaps=sel.map(id=>agencySnaps[id]);
+  // 涵蓋率差距大就警告：指標會被資料量牽著走
+  const pcts=snaps.map(s=>s.total?s.got/s.total:1);
+  const spread=Math.max.apply(null,pcts)-Math.min.apply(null,pcts);
+  if(spread>0.25){
+    h+='<div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 leading-relaxed">'+
+      '<i class="fa-solid fa-triangle-exclamation mr-1"></i><strong>這幾個機關的資料涵蓋率差距很大（'+
+      snaps.map(s=>esc(vendorShort(s.unit_name))+' '+(s.total?Math.round(s.got/s.total*100)+'%':'?')).join('、')+
+      '）。</strong>件數類的指標會被資料量牽著走，比例類的（流標率、集中度、落標率）才勉強可比。要嚴謹比較，請先把各機關都抓完。</div>';
+  }
+
+  h+='<div class="overflow-x-auto"><table class="w-full text-xs border-collapse min-w-[560px]">'+
+    '<thead><tr><th class="p-2 text-left bg-slate-50 border sticky left-0 z-10">指標</th>';
+  snaps.forEach(sn=>{
+    h+='<th class="p-2 text-left border bg-slate-50 align-top min-w-[140px]">'+
+      '<div class="font-bold text-ink-900 leading-snug">'+esc(sn.unit_name)+'</div>'+
+      '<div class="text-[10px] text-slate-400 font-mono mt-0.5">'+esc(sn.unit_id)+'</div></th>';
+  });
+  h+='</tr></thead><tbody>';
+  SNAP_ROWS.forEach(([label,fn,kind])=>{
+    const vals=snaps.map(sn=>{ try{ return fn(sn); }catch(e){ return '—'; } });
+    if(vals.every(v=>v==='—')) return;
+    // 數值列標出最高的那一格；比例類「越高越糟」用紅色，其餘用綠色
+    let best=-1;
+    if(kind==='num'||kind==='high-bad'){
+      const nums=snaps.map(sn=>snapNum(fn(sn)));
+      let bv=null; nums.forEach((v,i)=>{ if(v!=null&&(bv==null||v>bv)){ bv=v; best=i; } });
+    }
+    h+='<tr><td class="p-2 border bg-slate-50 font-semibold sticky left-0 z-10 align-top whitespace-nowrap">'+esc(label)+'</td>';
+    vals.forEach((v,i)=>{
+      const hi = i===best ? (kind==='high-bad'?'text-rose-600 font-bold':'text-jade-700 font-bold') : 'text-ink-900';
+      h+='<td class="p-2 border align-top '+hi+'">'+v+'</td>';
+    });
+    h+='</tr>';
+  });
+  h+='</tbody></table></div>'+
+    '<p class="text-[11px] text-slate-400 leading-relaxed">粗體標的是該列最高的一格：流標率、集中度這類「越高對新進者越不利」的用紅色，其餘用綠色。'+
+    '快照只存算好的數字、不存原始公告，所以不會佔太多空間，但也<strong>不會自動更新</strong>——機關有新公告要再點一次那個機關才會刷新。</p>';
+  box.innerHTML=h+'</div></details>';
+}
 
 function rhythmBlock(){
   const all=unitData.records;
@@ -1403,8 +1760,28 @@ function renderVendorRank(){
   if(unitVendorQ) vs=vs.filter(v=>v.name.indexOf(unitVendorQ)>=0);
   vs.sort((a,b)=> unitSort==='amount' ? (b.amount-a.amount)||(b.count-a.count) : (b.count-a.count)||(b.amount-a.amount));
   if(!vs.length){ box.innerHTML='<p class="text-xs text-slate-400 py-6 text-center">'+(unitVendorQ?'沒有符合的廠商。':'這個期間沒有決標紀錄。')+'</p>'; return; }
+  const con=concentration(vs);
   const show=vs.slice(0,50);
-  let h='<div class="flex text-[11px] text-slate-400 px-2 pb-2 border-b"><span class="w-8">排名</span><span class="flex-1">廠商</span><span class="w-16 text-right">件數</span><span class="w-24 text-right">決標金額</span><span class="w-4"></span></div>';
+  let h='';
+  if(con && !unitVendorQ){
+    const tone={jade:'bg-jade-50 border-jade-100 text-jade-700',
+                amber:'bg-amber-50 border-amber-100 text-amber-700',
+                rose:'bg-rose-50 border-rose-100 text-rose-700'}[con.tone];
+    h+='<div class="rounded-xl border '+tone+' p-3 mb-3">'+
+      '<div class="flex items-center justify-between flex-wrap gap-2">'+
+        '<div class="text-[11px] font-bold">市場集中度：'+con.band+'</div>'+
+        '<div class="text-[11px] opacity-70">HHI '+fmtNum(con.hhi)+'（&lt;1500 分散 · 1500–2500 中度 · &gt;2500 高度）</div>'+
+      '</div>'+
+      '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2.5">'+
+        '<div><div class="text-lg font-bold">'+pct1(con.cr1)+'</div><div class="text-[10px] opacity-70">最大一家佔比</div></div>'+
+        '<div><div class="text-lg font-bold">'+pct1(con.cr3)+'</div><div class="text-[10px] opacity-70">前三大佔比</div></div>'+
+        '<div><div class="text-lg font-bold">'+pct1(con.cr5)+'</div><div class="text-[10px] opacity-70">前五大佔比</div></div>'+
+        '<div><div class="text-lg font-bold">'+fmtNum(con.vendors)+'</div><div class="text-[10px] opacity-70">得標廠商家數</div></div>'+
+      '</div>'+
+      '<p class="text-[10px] opacity-60 mt-2 leading-relaxed">以<strong>件數</strong>佔比計算（不是金額，金額多半沒補齊）。共同投標／複數決標的案子會同時計入每一家，件數總和 '+fmtNum(con.totalCount)+' 因此大於案件數，集中度會被略微低估。</p>'+
+      '</div>';
+  }
+  h+='<div class="flex text-[11px] text-slate-400 px-2 pb-2 border-b"><span class="w-8">排名</span><span class="flex-1">廠商</span><span class="w-16 text-right">件數</span><span class="w-24 text-right">決標金額</span><span class="w-4"></span></div>';
   show.forEach((v,i)=>{
     h+='<div onclick="openVendorCases('+JSON.stringify(v.name).replace(/"/g,'&quot;')+')" class="flex items-center px-2 py-2.5 border-b last:border-0 cursor-pointer hover:bg-slate-50 text-sm">'+
       '<span class="w-8 text-xs font-mono text-slate-400">'+String(i+1).padStart(2,'0')+'</span>'+
@@ -1425,23 +1802,29 @@ function listUnitRecords(){
 }
 
 /* ---------- 決標金額補齊 ---------- */
+/* 決標金額快取的格式版本。v1 的 b（預算金額）因為上面那個 pick 陷阱全部是 0，
+   所以版本不符的項目要重抓一次，否則落標率永遠沒有樣本。 */
+const AMOUNT_VER = 2;
+
 async function fetchAmount(job_number){
   const r=await api('/api/tender?unit_id='+encodeURIComponent(unitData.unit_id)+'&job_number='+encodeURIComponent(job_number));
   const recs=r.records||[];
   const aw=recs.filter(x=>{const t=(x.brief&&x.brief.type)||''; return t.indexOf('決標公告')>=0&&t.indexOf('無法')<0;});
   const rec=aw.length?aw[aw.length-1]:recs[recs.length-1];
   const d=(rec&&rec.detail)||{};
-  return { a: parseMoney(pick(d,['總決標金額']))||parseMoney(pick(d,['決標金額']))||0,
-           d: pick(d,['決標日期'])||'', b: parseMoney(pick(d,['預算金額']))||0 };
+  return { a: pickMoney(d,['總決標金額','決標金額'])||0,
+           d: pick(d,['決標日期'])||'',
+           b: pickMoney(d,['預算金額']) || pickMoneyAcross(recs,['預算金額']) || 0,
+           v: AMOUNT_VER };
 }
 async function fillAmounts(jobs,onTick){
-  const todo=jobs.filter(j=>!amountCache[amtKey(j)]);
+  const todo=jobs.filter(j=>{ const c=amountCache[amtKey(j)]; return !c || c.v!==AMOUNT_VER; });
   if(!todo.length){ toast('這些案子都已經有金額了','info'); return 0; }
   fillAbort=false; let done=0,fail=0;
   for(const j of todo){
     if(fillAbort) break;
     try{ amountCache[amtKey(j)]=await fetchAmount(j); }
-    catch(e){ fail++; amountCache[amtKey(j)]={a:0,d:'',b:0,err:1}; }
+    catch(e){ fail++; amountCache[amtKey(j)]={a:0,d:'',b:0,err:1,v:AMOUNT_VER}; }
     done++; if(onTick) onTick(done,todo.length,fail);
     await new Promise(s=>setTimeout(s,320));
   }
@@ -1633,7 +2016,7 @@ async function refreshTrackedDetails(){
       const recs=r.records||[]; if(!recs.length) continue;
       const d=recs[recs.length-1].detail||{};
       t.deadline=pick(d,['截止投標','投標截止'])||t.deadline;
-      t.budget=pick(d,['預算金額'])||t.budget;
+      t.budget=budgetStr(d,recs)||t.budget;
       t.type=(recs[recs.length-1].brief&&recs[recs.length-1].brief.type)||t.type;
     }catch(e){}
     await new Promise(r=>setTimeout(r,300));
@@ -1679,7 +2062,7 @@ function cmpSection(k){ const i=k.indexOf(':'); return i>=0?k.slice(0,i):'其他
 /* 算出來的比較列：原始公告沒有這些欄位，但比較時最需要 */
 function cmpCalcRows(){
   const pubOf=x=>{ const d=String(x.date||''); return d.length===8?parseTwDate(d.slice(0,4)+'/'+d.slice(4,6)+'/'+d.slice(6)):null; };
-  const budOf=x=>parseMoney(x.budget)||parseMoney(pick(x.detail,['預算金額']))||null;
+  const budOf=x=>parseMoney(x.budget)||pickMoney(x.detail,['預算金額'])||null;
   const awOf =x=>{ const c=amountCache[x.unit_id+'|'+x.job_number]; return (c&&c.a)||null; };
   return [
     ['剩餘天數', x=>{ const l=daysLeft(parseTwDate(x.deadline)); return l==null?'':(l>=0?l+' 天':'已截止'); }],

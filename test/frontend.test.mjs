@@ -228,6 +228,134 @@ test('median 處理奇偶數與空陣列', () => {
   assert.equal(app.median([]), null);
 });
 
+test('pickMoney 不會被「是否公開」與 remind 說明騙走（實測踩到的 bug）', () => {
+  // 這是真實的決標公告 detail 鍵順序：「是否公開」排在金額前面。
+  // 原本用 pick() 子字串比對會先撞到它，parseMoney('是') = 0，
+  // 導致落標率與「決標／預算比」永遠算不出來、標案詳情的採購預算顯示「是」。
+  const award = {
+    '投標廠商:投標廠商2:決標金額': '4,788,000元',
+    '決標品項:第1品項:得標廠商1:決標金額': '4,788,000元',
+    '決標資料:總決標金額:remind': '決標金額是否係依預估條件估算之預估金額。估算方式：本案採實做實算。',
+    '決標資料:總決標金額': '4,788,000元',
+    '決標資料:總決標金額是否公開': '是',
+    '已公告資料:預算金額是否公開': '是',
+    '已公告資料:預算金額': '5,853,750元'
+  };
+  assert.equal(app.pickMoney(award, ['預算金額']), 5853750, '不可取到「是」');
+  assert.equal(app.pickMoney(award, ['總決標金額','決標金額']), 4788000, '要取總額，不是單一廠商金額');
+  assert.equal(app.pickMoney({}, ['預算金額']), null);
+  assert.equal(app.pickMoney(null, ['預算金額']), null);
+
+  // 招標公告的鍵順序相反（金額在前），兩種順序都要對
+  const tender = { '採購資料:預算金額': '5,853,750元', '採購資料:預算金額是否公開': '是' };
+  assert.equal(app.pickMoney(tender, ['預算金額']), 5853750);
+
+  // 只有「是否公開」而沒有金額時，必須回 null 而不是 0 或「是」
+  assert.equal(app.pickMoney({ '已公告資料:預算金額是否公開':'否' }, ['預算金額']), null);
+});
+
+test('pickMoneyAcross 決標公告沒有預算時回頭找招標公告', () => {
+  const records = [
+    { detail: { '採購資料:預算金額': '1,000,000元' } },              // 招標公告
+    { detail: { '決標資料:總決標金額': '900,000元' } }                // 決標公告（無預算欄位）
+  ];
+  assert.equal(app.pickMoneyAcross(records, ['預算金額']), 1000000);
+  assert.equal(app.pickMoneyAcross(records, ['總決標金額']), 900000);
+  assert.equal(app.pickMoneyAcross([], ['預算金額']), null);
+  assert.equal(app.pickMoneyAcross(null, ['預算金額']), null);
+});
+
+test('budgetStr 回傳純數字字串，讓顯示端能 parseMoney', () => {
+  const award = { '已公告資料:預算金額是否公開':'是', '已公告資料:預算金額':'5,853,750元' };
+  assert.equal(app.budgetStr(award, []), '5853750');
+  // 決標公告沒有預算欄位時，退回整案紀錄去找
+  assert.equal(app.budgetStr({}, [{ detail:{ '採購資料:預算金額':'2,500,000元' } }]), '2500000');
+  assert.equal(app.budgetStr({}, []), '');
+});
+
+test('concentration 算出 CR 與 HHI', () => {
+  // A 5 件、B 3 件、C 2 件，共 10 件
+  // CR1 = 50%、CR3 = 100%、HHI = 50² + 30² + 20² = 3800 → 高度集中
+  const vs = [{name:'A',count:5},{name:'B',count:3},{name:'C',count:2}];
+  const c = app.concentration(vs);
+  assert.equal(c.vendors, 3);
+  assert.equal(c.totalCount, 10);
+  assert.equal(c.cr1, 0.5);
+  assert.equal(c.cr3, 1);
+  assert.equal(c.hhi, 3800);
+  assert.equal(c.band, '高度集中');
+  // 獨家包走 → HHI 上限 10000
+  assert.equal(app.concentration([{name:'X',count:6}]).hhi, 10000);
+  // 十家均分 → HHI = 10 × 10² = 1000 → 分散
+  const ten = Array.from({length:10}, (_,i) => ({name:'V'+i, count:1}));
+  assert.equal(app.concentration(ten).hhi, 1000);
+  assert.equal(app.concentration(ten).band, '分散');
+  // 分級門檻：佔比 30/25/20/15/10 → HHI = 900+625+400+225+100 = 2250 → 中度集中
+  const mid = app.concentration([{name:'A',count:30},{name:'B',count:25},
+    {name:'C',count:20},{name:'D',count:15},{name:'E',count:10}]);
+  assert.equal(mid.hhi, 2250);
+  assert.equal(mid.band, '中度集中');
+  // 35/35/30 的 HHI 是 3350，已經算高度集中（門檻 2500）
+  assert.equal(app.concentration([{name:'A',count:35},{name:'B',count:35},{name:'C',count:30}]).hhi, 3350);
+  assert.equal(app.concentration([]), null);
+});
+
+test('ratioStats 算落標率中位數與分佈', () => {
+  const rows = [0.60,0.85,0.90,1.05].map((ratio,i) =>
+    ({ ratio, job:'J'+i, title:'案'+i, date:'2025'+String(i+1).padStart(2,'0')+'01',
+       award:ratio*1e6, budget:1e6, year:'2025' }));
+  const st = app.ratioStats(rows);
+  assert.equal(st.n, 4);
+  assert.equal(st.median, 0.875, '偶數筆應取兩中位數平均，不可四捨五入');
+  const d = Object.fromEntries(st.dist);
+  assert.equal(d['< 70%'], 1);
+  assert.equal(d['80–90%'], 1);
+  assert.equal(d['90–95%'], 1);
+  assert.equal(d['≥ 100%'], 1);
+  assert.equal(d['70–80%'], 0);
+  assert.equal(st.lowest[0].ratio, 0.60, '最低的排第一');
+  assert.equal(st.highest[0].ratio, 1.05, '最高的排第一');
+  assert.equal(st.years.length, 1);
+  assert.equal(st.years[0].n, 4);
+  assert.equal(app.ratioStats([]), null);
+});
+
+test('debarredList 抓出停權公告並保留各廠商', () => {
+  const rec = (date,type,title,job,vendors=[]) =>
+    ({ date, job_number:job, brief:{ type, title, companies:{ names:vendors, ids:[] } } });
+  const recs = [
+    rec('20260105','拒絕往來廠商名單公告','違約案','D1',['甲公司']),
+    rec('20260106','拒絕往來廠商名單公告','違約案','D2',['乙公司']),
+    rec('20260107','拒絕往來廠商名單更正公告','違約案','D3',['丙公司']),
+    rec('20260108','決標公告','一般案','A1',['丁公司'])
+  ];
+  const list = app.debarredList(recs);
+  assert.equal(list.length, 3, '只取拒絕往來相關公告');
+  assert.equal(list[0].date, '20260107', '應依日期新到舊');
+  assert.equal(list[0].correction, true, '更正公告要標記');
+  assert.equal(list[2].correction, false);
+  assert.deepEqual(list[1].vendors, ['乙公司']);
+});
+
+test('snapNum 抽數字時要先去掉千分位（否則 1,200 會輸給 999）', () => {
+  const f = app.snapNum;
+  assert.equal(f('1,200'), 1200);
+  assert.equal(f('999'), 999);
+  assert.ok(f('1,200') > f('999'), '這正是加逗號前會弄錯的比較');
+  assert.equal(f('12,936'), 12936);
+  assert.equal(f('16.7%'), 16.7);
+  assert.equal(f('87.5% <span class="x">4 案</span>'), 87.5, '要先去掉 HTML 標籤');
+  assert.equal(f('10,000（高度集中）'), 10000);
+  assert.equal(f('—'), null);
+  assert.equal(f(null), null);
+});
+
+test('medianF 不四捨五入（落標率要保留小數）', () => {
+  assert.equal(app.medianF([1,2,3]), 2);
+  assert.equal(app.medianF([0.85,0.90]), 0.875);
+  assert.equal(app.medianF([]), null);
+});
+
 test('cmpLabel / cmpSection 拆解公告欄位的分區前綴', () => {
   assert.equal(app.cmpLabel('招標資料:是否屬統包'), '是否屬統包');
   assert.equal(app.cmpSection('招標資料:是否屬統包'), '招標資料');
