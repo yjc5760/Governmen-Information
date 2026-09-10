@@ -232,6 +232,21 @@ test('median 處理奇偶數與空陣列', () => {
   assert.equal(app.median([]), null);
 });
 
+test('「只清快取」的名單不可誤含使用者資料', () => {
+  // clearCaches() 會刪掉 CACHE_KEYS 裡的每個鍵。萬一有人把 TRACKED 之類加進去，
+  // 使用者按「只清快取」就會靜靜失去自己輸入的資料——這個測試守著那條線。
+  const cache = app.cacheKeyNames();
+  const mustKeep = ['TRACKED','COMPARE','WATCH','RIVALS','AGENCY','CMPVIEW','BASE','TOKEN','PROXY'];
+  mustKeep.forEach(k => assert.ok(cache.indexOf(k) < 0, k + ' 是使用者資料，不可列入可清除的快取'));
+  // 反向：真正的快取都該在名單裡，否則「只清快取」清不乾淨、配額還是滿的
+  ['DAYCACHE','AMOUNT','SNAP','VSNAP'].forEach(k =>
+    assert.ok(cache.indexOf(k) >= 0, k + ' 是可重建的快取，應列入'));
+  // 兩份名單必須把所有鍵剛好切開，沒有漏也沒有重複
+  const user = app.userKeyNames();
+  assert.equal(cache.length + user.length, cache.concat(user).filter((v,i,a)=>a.indexOf(v)===i).length,
+    '快取名單與使用者資料名單不可重疊');
+});
+
 test('pickDriver 依選擇性挑主查詢：統編 › 廠商名稱 › 標案名稱', () => {
   const f = app.pickDriver;
   // API 一次只能用一個條件查，所以要挑選擇性最高的當主查詢
@@ -311,15 +326,59 @@ test('sameVendor 認得同一家廠商的不同寫法', () => {
   assert.ok(!f('中興工程顧問', ''));
 });
 
-test('isRealAward 只認真正的決標公告', () => {
-  const f = app.isRealAward;
-  assert.equal(f('決標公告'), true);
-  assert.equal(f('更正決標公告'), false, '更正不能重複計入');
-  assert.equal(f('無法決標公告'), false);
-  assert.equal(f('更正無法決標公告'), false);
-  assert.equal(f('定期彙送'), false);
-  assert.equal(f('公開招標公告'), false);
-  assert.equal(f(''), false);
+test('公告類型判斷：統計用一案一筆，顯示用含更正（實測踩到的虛增 20.9%）', () => {
+  // 台電總公司 30,000 筆的真實類型分布告訴我們：'更正決標公告' 含 '決標公告'，
+  // 舊的 isAwardRec 因此把 2,709 筆更正算成決標，決標數虛增 20.9%。
+  assert.equal(app.isAward('決標公告'), true);
+  assert.equal(app.isAward('更正決標公告'), false, '更正不可重複計入');
+  assert.equal(app.isAward('無法決標公告'), false);
+  assert.equal(app.isAward('更正無法決標公告'), false);
+  assert.equal(app.isAward('撤銷無法決標公告'), false);
+  assert.equal(app.isAward('公開招標公告'), false);
+
+  assert.equal(app.isFailedAward('無法決標公告'), true);
+  assert.equal(app.isFailedAward('更正無法決標公告'), false);
+  assert.equal(app.isFailedAward('撤銷無法決標公告'), false, '撤銷流標語意相反，不是流標');
+  assert.equal(app.isFailedAward('決標公告'), false);
+
+  // 招標：這些名稱不含 '招標公告'，舊寫法會漏掉
+  assert.equal(app.isTender('公開招標公告'), true);
+  assert.equal(app.isTender('限制性招標(經公開評選或公開徵求)公告'), true, '1,109 筆曾被漏掉');
+  assert.equal(app.isTender('選擇性招標(建立合格廠商名單)公告'), true);
+  assert.equal(app.isTender('公開取得報價單或企劃書公告'), true);
+  // 這些含 '招標' 或 '公開取得' 但不是招標本身
+  assert.equal(app.isTender('招標文件公開閱覽公告資料公告'), false, '公開閱覽是招標前置作業');
+  assert.equal(app.isTender('公開徵求廠商提供參考資料公告'), false);
+  assert.equal(app.isTender('公開招標更正公告'), false);
+  assert.equal(app.isTender('公開取得報價單或企劃書更正公告'), false, '更正不算一次招標');
+  assert.equal(app.isTender('定期彙送'), false);
+  assert.equal(app.isTender('財物變賣公告'), false);
+  assert.equal(app.isTender('決標公告'), false);
+
+  assert.equal(app.isDebarred('拒絕往來廠商名單公告'), true);
+  assert.equal(app.isDebarred('拒絕往來廠商名單更正公告'), false);
+
+  // 顯示用：更正該一起顯示，但無法決標絕不能混進「只看決標公告」
+  assert.equal(app.isAwardNotice('決標公告'), true);
+  assert.equal(app.isAwardNotice('更正決標公告'), true, '更正決標也是決標資訊');
+  assert.equal(app.isAwardNotice('無法決標公告'), false, '這是「只看決標公告」原本多列 2,937 筆的原因');
+  assert.equal(app.isTenderNotice('公開招標更正公告'), true);
+  assert.equal(app.isTenderNotice('無法決標公告'), false);
+  assert.equal(app.isTenderNotice('定期彙送'), false);
+});
+
+test('用真實類型分布驗證決標數不再虛增', () => {
+  // 這是台電總公司 3.13.31 實測 30,000 筆的分布（節錄相關類型）
+  const dist = { '決標公告':12936, '更正決標公告':2709, '無法決標公告':2937,
+                 '更正無法決標公告':63, '撤銷無法決標公告':1, '公開招標公告':3943,
+                 '限制性招標(經公開評選或公開徵求)公告':1109, '公開招標更正公告':768,
+                 '招標文件公開閱覽公告資料公告':243, '定期彙送':938 };
+  const sum = pred => Object.entries(dist).reduce((n,[t,c]) => n + (pred(t)?c:0), 0);
+  assert.equal(sum(app.isAward), 12936, '決標數必須只有真正的決標公告');
+  assert.equal(sum(app.isFailedAward), 2937, '流標數不含更正與撤銷');
+  assert.equal(sum(app.isAwardNotice), 12936+2709, '顯示用含更正決標');
+  assert.equal(sum(t=>t.indexOf('決標')>=0), 12936+2709+2937+63+1,
+    '這是舊的「只看決標」寫法會撈到的量，用來對照');
 });
 
 test('buildVendorSnap 算出決標件數、機關分布與共同投標夥伴', () => {
