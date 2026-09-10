@@ -49,6 +49,11 @@ proxy 預設只綁 `127.0.0.1`，同一台機器以外連不進來。想從手�
 ├── test/
 │   ├── parse.test.mjs      server.js 的煙霧測試（不連外網）
 │   └── frontend.test.mjs   前端純邏輯測試（用 node:vm 跑 HTML 裡的 script，零額外依賴）
+├── build/
+│   ├── build-exe.mjs       打包成單一執行檔（Node SEA）
+│   ├── exe-entry.mjs       打包後的入口（自動開瀏覽器、連接埠備援）
+│   └── 打包exe.bat         Windows 一鍵打包
+├── dist/                   打包產物，不進版控
 ├── package.json
 ├── start-windows.bat
 ├── start-mac-linux.sh
@@ -65,6 +70,52 @@ npm test                 # 改完 server.js 先跑這個
 ```
 
 ---
+
+## 打包成單一 exe 分享給沒裝 Node.js 的人
+
+```
+build\打包exe.bat        ← Windows 雙擊即可
+npm run build:exe        ← 或用指令
+```
+
+產出 `dist/標案參謀室.exe`（約 86 MB，壓縮後約 32 MB）＋`使用說明.txt`。
+同仁**不需要安裝任何東西**：雙擊 exe → 啟動本機伺服器 → 自動開瀏覽器。
+
+用的是 **Node.js 官方的 SEA**（Single Executable Application），不是 pkg／nexe：
+
+1. `esbuild` 把 `server.js` ＋ cheerio ＋ iconv-lite ＋ **HTML** 打成一支 CJS
+   （SEA 的主程式只吃 CommonJS；HTML 用 `--loader:.html=text` 內嵌成字串）
+2. `node --experimental-sea-config` 產生 blob
+3. `postject` 把 blob 注入 `node.exe`
+
+幾個必須知道的限制與設計：
+
+- **blob 必須由跟目標 `node.exe` 相同版本的 node 產生。** 在 Windows 上打包時
+  直接複製自己的 `node.exe`，最單純；在 Linux 上跨平台打包則會從 npm 抓
+  `node-win-x64@<當前 node 版本>`（那個套件裡就是官方的 Windows node.exe）。
+- **CJS 不支援 top-level await**，所以 `exe-entry.mjs` 把啟動流程包在 `main()` 裡。
+- **bundler 會把 `import.meta.url` 變成空值**，`fileURLToPath` 會拋錯。
+  `server.js` 因此用 `selfPath` 包了 try/catch，並據此判斷「是否為主程式」——
+  被 import（含打包）時不會自己 `listen`。
+- **版號要在編譯期固化**：`VERSION` 平常讀 `package.json`，但 exe 旁邊沒有那個檔，
+  所以打包時用 `--define:__APP_VERSION__` 傳進去再 `setVersion()`。
+  （`--define` 的值是 JS 運算式，字串只能包一層引號，包兩層會變成 `v"1.1.0"`。）
+- **exe 旁邊放一份 `標案參謀室.html` 會覆蓋內建版本**，所以只改網頁時不必重新打包。
+  黑色視窗會顯示讀到哪一份。
+- 連接埠 5178 被占用時自動往上找到 5187（同仁可能不小心開兩次）。
+  ⚠️ 不同連接埠在瀏覽器眼中是不同網站，**localStorage 資料是分開的**。
+- 只綁 `127.0.0.1`，同網段的人連不進來。
+
+### 分享時要先跟同仁講的事
+
+- **Windows SmartScreen 會警告**（「Windows 已保護您的電腦」），要點「其他資訊 → 仍要執行」。
+  因為沒有買數位簽章。
+- 更麻煩的是：官方 `node.exe` 本身有簽章，注入 blob 之後**簽章會失效**
+  （postject 會印 `The signature seems corrupted!`）。有些公司防毒對「未簽章又會開網路埠」
+  的執行檔會直接隔離。我沒有動手移除那份失效簽章——手改 PE 標頭在無法實測 Windows 的
+  情況下風險太高。若真的被隔離，退路是**資料夾版**：一份 `node.exe` ＋ `server.js` ＋
+  `標案參謀室.html` ＋ 一個啟動用的 `.bat`，壓成 zip；沒有單一 exe 的隔離問題。
+- 資料存在各人自己的瀏覽器裡，**換人換電腦就是空的**，要搬移請用頁尾的匯出／匯入備份。
 
 ## 兩條資料來源
 

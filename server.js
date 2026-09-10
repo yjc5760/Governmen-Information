@@ -17,8 +17,21 @@ import { fileURLToPath } from 'node:url';
 import * as cheerio from 'cheerio';
 import iconv from 'iconv-lite';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname);
+/* 打包成單一執行檔時，bundler 會把 import.meta.url 變成空值，
+   fileURLToPath 會拋錯，所以包起來。取不到就退回 cwd（打包後的入口會另外
+   用 setStaticRoot() 指定 exe 所在資料夾）。 */
+const selfPath = (() => { try { return fileURLToPath(import.meta.url); } catch { return ''; } })();
+const __dirname = selfPath ? path.dirname(selfPath) : process.cwd();
+let ROOT = path.resolve(__dirname);
+
+/* 打包成單一執行檔（Node SEA）時，HTML 是內嵌在 exe 裡的，磁碟上不存在。
+   但仍優先讀磁碟——這樣 exe 旁邊放一份新的 標案參謀室.html 就能直接覆蓋，
+   不必為了改網頁重新打包。 */
+const embedded = new Map();
+export function setStaticRoot(dir){ ROOT = path.resolve(dir); }
+export function addEmbeddedFile(name, content){
+  embedded.set(name, Buffer.isBuffer(content) ? content : Buffer.from(String(content),'utf8'));
+}
 
 const PORT = Number(process.env.PORT) || 5178;
 const HOST = process.env.HOST || '127.0.0.1';   // 只綁本機，不對外網開放
@@ -32,11 +45,15 @@ const PAGE_SIZE_MAX = 100;
 
 const INDEX_FILE = '標案參謀室.html';
 
-const VERSION = (() => {
+/* 版號平常讀 package.json；打包成單一執行檔時旁邊沒有 package.json，
+   所以由打包流程在編譯期呼叫 setVersion() 固化進去。 */
+let VERSION = (() => {
   try {
     return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version || '0.0.0';
   } catch { return '0.0.0'; }
 })();
+export function setVersion(v){ if(v) VERSION = String(v); }
+export function getVersion(){ return VERSION; }
 
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
@@ -282,9 +299,16 @@ function resolveStatic(pathname) {
   if (BLOCKED.some(re => re.test(inside))) return null;
 
   let st;
-  try { st = fs.statSync(full); } catch { return null; }
-  if (!st.isFile()) return null;
-  return { full, size: st.size, mtime: st.mtime };
+  try { st = fs.statSync(full); } catch { st = null; }
+  if (st && st.isFile()) return { full, size: st.size, mtime: st.mtime };
+
+  // 磁碟上沒有 → 看看是不是內嵌在執行檔裡
+  const name = path.basename(full);
+  if (embedded.has(name)) {
+    const buf = embedded.get(name);
+    return { full, name, size: buf.length, mtime: new Date(0), buffer: buf };
+  }
+  return null;
 }
 
 function serveStatic(res, hit, { head = false } = {}) {
@@ -296,6 +320,7 @@ function serveStatic(res, hit, { head = false } = {}) {
     'Cache-Control': 'no-cache'
   });
   if (head) return res.end();
+  if (hit.buffer) return res.end(hit.buffer);
   fs.createReadStream(hit.full).on('error', () => res.end()).pipe(res);
 }
 
@@ -408,9 +433,36 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-export { parseRows, parseRocDate, parseBudget, resolveStatic, applyFilters };
+/* 啟動伺服器。連接埠被占用時往上找下一個（同仁可能會不小心開兩次）。 */
+export function start({ port = PORT, host = HOST, tries = 10 } = {}){
+  return new Promise((resolve, reject) => {
+    let attempt = 0;
+    const tryListen = () => {
+      const onError = e => {
+        server.removeListener('listening', onOk);
+        if (e.code === 'EADDRINUSE' && ++attempt < tries) {
+          port += 1;
+          setImmediate(tryListen);
+        } else reject(e);
+      };
+      const onOk = () => {
+        server.removeListener('error', onError);
+        resolve({ server, port, host });
+      };
+      server.once('error', onError);
+      server.once('listening', onOk);
+      server.listen(port, host);
+    };
+    tryListen();
+  });
+}
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+export { server, parseRows, parseRocDate, parseBudget, resolveStatic, applyFilters, INDEX_FILE };
+
+/* 直接用 node server.js 跑才自動啟動；被 import（含打包進 exe）時不要自己 listen */
+const isMainModule = !!selfPath && !!process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(selfPath);
+if (isMainModule) {
   server.on('error', e => {
     if (e.code === 'EADDRINUSE') {
       console.error('\n  連接埠 ' + PORT + ' 已被占用。');

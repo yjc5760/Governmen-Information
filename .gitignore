@@ -5,6 +5,9 @@ node_modules/
 *.backup-*.html
 *.backup.html
 
+# 打包產物（用 npm run build:exe 重建）
+dist/
+
 # 執行期產物
 *.log
 npm-debug.log*
