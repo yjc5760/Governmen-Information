@@ -232,6 +232,36 @@ test('median 處理奇偶數與空陣列', () => {
   assert.equal(app.median([]), null);
 });
 
+test('searchEndpoint 對應三種查詢模式', () => {
+  assert.equal(app.searchEndpoint('title'), 'searchbytitle');
+  assert.equal(app.searchEndpoint('company'), 'searchbycompanyname');
+  assert.equal(app.searchEndpoint('companyid'), 'searchbycompanyid');
+  assert.equal(app.searchEndpoint(''), 'searchbytitle', '預設走標案名稱');
+});
+
+test('matchAgencies 從機關索引比對，短名稱（上層機關）排前面', () => {
+  // 機關索引是「機關 AND 標案名稱」能不能走精準路徑的依據
+  app.noteAgency('3.13.31',    '台灣電力股份有限公司');
+  app.noteAgency('3.13.31.48', '台灣電力股份有限公司大林發電廠');
+  app.noteAgency('3.13.31.49', '台灣電力股份有限公司興達發電廠');
+  app.noteAgency('3.9.1',      '台灣中油股份有限公司');
+
+  const many = app.matchAgencies('台灣電力');
+  assert.equal(many.length, 3, '台灣電力應命中總公司與兩個電廠');
+  assert.equal(many[0][0], '台灣電力股份有限公司', '較短的排前面');
+  assert.equal(many[0][1], '3.13.31', '要帶回 unit_id');
+
+  const one = app.matchAgencies('大林發電廠');
+  assert.equal(one.length, 1, '唯一命中才會走精準路徑');
+  assert.equal(one[0][1], '3.13.31.48');
+
+  assert.equal(app.matchAgencies('發電廠').length, 2);
+  assert.equal(app.matchAgencies('完全不存在的機關').length, 0);
+  assert.equal(app.matchAgencies('').length, 0);
+  assert.equal(app.matchAgencies(null).length, 0);
+  assert.equal(app.matchAgencies('  ').length, 0, '空白字串不可命中全部');
+});
+
 test('sameVendor 認得同一家廠商的不同寫法', () => {
   const f = app.sameVendor;
   // 廠商查詢回傳的名稱可能帶英文後綴
