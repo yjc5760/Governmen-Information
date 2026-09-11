@@ -232,6 +232,41 @@ test('median 處理奇偶數與空陣列', () => {
   assert.equal(app.median([]), null);
 });
 
+test('jsArg 讓字串能安全塞進 HTML 屬性', () => {
+  const f = app.jsArg;
+  // JSON.stringify 產生的雙引號會把 onchange="..." 屬性截斷，必須轉成 &quot;
+  assert.equal(f('亞新工程顧問'), '&quot;亞新工程顧問&quot;');
+  assert.ok(!f('亞新工程顧問').includes('"'), '輸出不可含裸雙引號');
+  // 名稱本身含引號、& 也要安全
+  assert.ok(!f('某公司"特殊"名').includes('&quot;某公司"'), '內層引號也要跳脫');
+  assert.ok(!/[^&]"/.test(f('A&B "C"')), '所有裸雙引號都要處理掉');
+  assert.equal(f('A&B'), '&quot;A&amp;B&quot;');
+  assert.equal(f(null), '&quot;&quot;');
+  assert.equal(f(undefined), '&quot;&quot;');
+  // 解碼回來要能還原成原字串（模擬瀏覽器解析屬性）
+  const decode = t => t.replace(/&quot;/g,'"').replace(/&amp;/g,'&');
+  for (const v of ['亞新工程顧問','A&B','含"引號"的名稱',"含'單引號'"]) {
+    assert.equal(JSON.parse(decode(f(v))), v, '往返後必須等於原字串：' + v);
+  }
+});
+
+test('原始碼裡不可再出現「把 JSON.stringify 直接塞進事件屬性」的寫法', () => {
+  // 這是實際發生過的 bug：屬性是雙引號包的，JSON.stringify 產生的字串也帶雙引號，
+  //   onchange="toggleVsnapSel("亞新工程顧問",this.checked)"
+  //                            ↑ HTML 解析器在這裡就把屬性結束掉
+  // handler 變成語法錯誤，按鈕完全沒反應。當時廠商對比、機關對比的核取方塊、
+  // 快速加入對手、更新／移除、重試按鈕全都是死的，而單元測試因為直接呼叫函式
+  // 而不是點擊，完全沒抓到。這個測試掃原始碼，從源頭擋掉。
+  const html = fs.readFileSync(HTML, 'utf8');
+  const bad = [...html.matchAll(/on(?:click|change|input|submit)="[^"]*'\s*\+\s*JSON\.stringify\(/g)];
+  assert.equal(bad.length, 0,
+    '事件屬性裡要用 jsArg() 而不是 JSON.stringify()，發現 ' + bad.length + ' 處：' +
+    bad.map(m => m[0]).join(' / '));
+  // 而且 jsArg 必須真的有被用在事件屬性裡（避免有人把它整個拿掉）
+  assert.ok(/on(?:click|change)="[^"]*'\s*\+\s*jsArg\(/.test(html),
+    '事件屬性應該要透過 jsArg() 傳字串參數');
+});
+
 test('「只清快取」的名單不可誤含使用者資料', () => {
   // clearCaches() 會刪掉 CACHE_KEYS 裡的每個鍵。萬一有人把 TRACKED 之類加進去，
   // 使用者按「只清快取」就會靜靜失去自己輸入的資料——這個測試守著那條線。

@@ -475,6 +475,17 @@ let calCursor     = new Date();
 
 /* ================= 小工具 ================= */
 function esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':String(s); return d.innerHTML; }
+
+/* 把字串當參數塞進 HTML 的 onclick／onchange 屬性時一定要用這個。
+   屬性是用雙引號包的，而 JSON.stringify 產生的字串也帶雙引號，直接內插會讓
+   HTML 解析器在第一個內層引號就把屬性截斷 ——
+     onchange="toggleVsnapSel("亞新工程顧問",this.checked)"
+                              ↑ 屬性到這裡就結束了
+   handler 變成語法錯誤，按鈕完全沒反應，而且主控台不一定看得到錯誤。
+   （廠商對比與機關對比的核取方塊就是這樣壞掉的。） */
+function jsArg(v){
+  return JSON.stringify(String(v==null?'':v)).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+}
 function toast(msg,type='info'){
   const ic={success:'fa-circle-check text-emerald-500',error:'fa-triangle-exclamation text-rose-500',warning:'fa-circle-exclamation text-amber-500',info:'fa-circle-info text-jade-600'};
   const t=document.createElement('div');
@@ -1007,7 +1018,7 @@ function agencyOnlyHelp(ag,hits){
     list.innerHTML='<div class="card p-6 space-y-3">'+
       '<p class="text-sm text-slate-600">機關索引裡有 <strong>'+hits.length+'</strong> 個機關含「'+esc(ag)+'」。挑一個，或再補上其他條件一起查。</p>'+
       '<div class="flex flex-wrap gap-1.5">'+
-      hits.slice(0,30).map(([nm])=>'<button onclick="pickAgency('+JSON.stringify(nm)+')" class="tag bg-slate-100 hover:bg-jade-100 text-slate-700 hover:text-jade-800">'+esc(nm)+'</button>').join('')+
+      hits.slice(0,30).map(([nm])=>'<button onclick="pickAgency('+jsArg(nm)+')" class="tag bg-slate-100 hover:bg-jade-100 text-slate-700 hover:text-jade-800">'+esc(nm)+'</button>').join('')+
       (hits.length>30?'<span class="text-[11px] text-slate-400">…另 '+(hits.length-30)+' 個，請輸入更完整的名稱</span>':'')+
       '</div></div>';
   }else{
@@ -1147,7 +1158,7 @@ async function runScan(){
   if(stopped) pb+='<button onclick="runScan()" class="px-3 py-2 text-xs rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium">重試</button>';
   if(st.agHits && st.agHits.length){
     pb+='<span class="text-[11px] text-slate-400 self-center">機關索引命中 '+st.agHits.length+' 個，改走精準：</span>'+
-        st.agHits.slice(0,6).map(([nm])=>'<button onclick="pickAgency('+JSON.stringify(nm)+')" class="tag bg-jade-50 border border-jade-200 text-jade-700 hover:bg-jade-100">'+esc(nm)+'</button>').join('');
+        st.agHits.slice(0,6).map(([nm])=>'<button onclick="pickAgency('+jsArg(nm)+')" class="tag bg-jade-50 border border-jade-200 text-jade-700 hover:bg-jade-100">'+esc(nm)+'</button>').join('');
   }
   pager.innerHTML=pb+'</div>';
 }
@@ -1562,7 +1573,7 @@ async function openAgency(unit_id,unit_name){
   if(!r.all.length){
     const msg=(r.stop.reason==='error')?('第 '+r.stop.page+' 頁抓取失敗：'+r.stop.message):'這個機關沒有公告紀錄';
     box.innerHTML='<div class="card p-6 space-y-3"><p class="text-sm text-rose-600">載入失敗：'+esc(msg)+'</p>'+
-      '<button onclick="openAgency('+JSON.stringify(unit_id)+','+JSON.stringify(unit_name||'')+')" class="px-3 py-2 text-xs border rounded-lg hover:bg-slate-50">重試</button></div>';
+      '<button onclick="openAgency('+jsArg(unit_id)+','+jsArg(unit_name||'')+')" class="px-3 py-2 text-xs border rounded-lg hover:bg-slate-50">重試</button></div>';
     return;
   }
   unitData={unit_id,unit_name:r.name,records:r.all,total:r.total,totalPages:r.tp,
@@ -2059,8 +2070,11 @@ function renderAgencyCompare(){
   const ids=Object.keys(agencySnaps).sort((a,b)=>agencySnaps[b].at-agencySnaps[a].at);
   if(!ids.length){ box.innerHTML=''; return; }
   const sel=snapSel.filter(id=>agencySnaps[id]);
+  /* 每次勾選都會重繪整個 <details>，只看 sel.length 決定 open 的話，
+     勾第一個時面板會當場收起來。所以沿用目前的展開狀態。 */
+  const wasOpen=!!(box.querySelector('details')||{}).open;
 
-  let h='<details class="card p-0"'+(sel.length>=2?' open':'')+'>'+
+  let h='<details class="card p-0"'+((wasOpen||sel.length>=2)?' open':'')+'>'+
     '<summary class="p-4 cursor-pointer flex items-center justify-between flex-wrap gap-2">'+
       '<div><div class="eyebrow">AGENCY COMPARE</div>'+
       '<h3 class="font-bold text-ink-900 mt-1">機關對比</h3>'+
@@ -2074,10 +2088,10 @@ function renderAgencyCompare(){
     const sn=agencySnaps[id], on=sel.indexOf(id)>=0;
     h+='<label class="flex items-center gap-1.5 text-[11px] px-2 py-1.5 rounded-lg border cursor-pointer '+
       (on?'bg-jade-50 border-jade-300 text-jade-800 font-semibold':'bg-white hover:bg-slate-50 text-slate-600')+'">'+
-      '<input type="checkbox" '+(on?'checked':'')+' onchange="toggleSnapSel('+JSON.stringify(id)+',this.checked)">'+
+      '<input type="checkbox" '+(on?'checked':'')+' onchange="toggleSnapSel('+jsArg(id)+',this.checked)">'+
       '<span>'+esc(vendorShort(sn.unit_name))+'</span>'+
       '<span class="text-slate-400">'+fmtNum(sn.got)+' 則</span>'+
-      '<span onclick="event.preventDefault();event.stopPropagation();dropSnap('+JSON.stringify(id)+')" class="text-slate-300 hover:text-rose-500 ml-0.5" title="刪除這份快照">✕</span>'+
+      '<span onclick="event.preventDefault();event.stopPropagation();dropSnap('+jsArg(id)+')" class="text-slate-300 hover:text-rose-500 ml-0.5" title="刪除這份快照">✕</span>'+
       '</label>';
   });
   h+='<button onclick="clearSnaps()" class="text-[11px] text-slate-400 hover:text-rose-500 underline ml-1">全部清掉</button></div>';
@@ -2253,7 +2267,7 @@ function renderVendorRank(){
   }
   h+='<div class="flex text-[11px] text-slate-400 px-2 pb-2 border-b"><span class="w-8">排名</span><span class="flex-1">廠商</span><span class="w-16 text-right">件數</span><span class="w-24 text-right">決標金額</span><span class="w-4"></span></div>';
   show.forEach((v,i)=>{
-    h+='<div onclick="openVendorCases('+JSON.stringify(v.name).replace(/"/g,'&quot;')+')" class="flex items-center px-2 py-2.5 border-b last:border-0 cursor-pointer hover:bg-slate-50 text-sm">'+
+    h+='<div onclick="openVendorCases('+jsArg(v.name)+')" class="flex items-center px-2 py-2.5 border-b last:border-0 cursor-pointer hover:bg-slate-50 text-sm">'+
       '<span class="w-8 text-xs font-mono text-slate-400">'+String(i+1).padStart(2,'0')+'</span>'+
       '<span class="flex-1 min-w-0 truncate pr-2 text-ink-900">'+esc(vendorShort(v.name))+(v.multi?' <span class="tag bg-slate-100 text-slate-600">共同</span>':'')+'</span>'+
       '<span class="w-16 text-right font-semibold">'+v.count+' 件</span>'+
@@ -2536,7 +2550,7 @@ function renderRivals(){
   if(notYet.length){
     h+='<div class="mt-2.5 flex flex-wrap gap-1.5 items-center">'+
       '<span class="text-[11px] text-slate-400">常見工程顧問：</span>'+
-      notYet.map(x=>'<button onclick="addRival('+JSON.stringify(x)+')" class="tag bg-slate-100 hover:bg-jade-100 text-slate-600 hover:text-jade-700">+ '+esc(x)+'</button>').join('')+
+      notYet.map(x=>'<button onclick="addRival('+jsArg(x)+')" class="tag bg-slate-100 hover:bg-jade-100 text-slate-600 hover:text-jade-700">+ '+esc(x)+'</button>').join('')+
       '</div>';
   }
   h+='<div id="rivalStatus" class="text-xs text-jade-700 mt-2"></div>';
@@ -2557,8 +2571,8 @@ function renderRivals(){
             :'<div class="text-[11px] text-slate-400 mt-0.5">還沒抓過</div>')+
         '</div>'+
         '<div class="flex gap-1.5 flex-shrink-0">'+
-          '<button onclick="refreshOneRival('+JSON.stringify(name)+')" class="px-2.5 py-1.5 text-[11px] border rounded-lg hover:bg-slate-50">更新</button>'+
-          '<button onclick="removeRival('+JSON.stringify(name)+')" class="px-2 py-1.5 text-[11px] text-slate-400 hover:text-rose-500">移除</button>'+
+          '<button onclick="refreshOneRival('+jsArg(name)+')" class="px-2.5 py-1.5 text-[11px] border rounded-lg hover:bg-slate-50">更新</button>'+
+          '<button onclick="removeRival('+jsArg(name)+')" class="px-2 py-1.5 text-[11px] text-slate-400 hover:text-rose-500">移除</button>'+
         '</div>'+
       '</div>';
     if(sn){
@@ -2605,8 +2619,9 @@ function renderVendorCompare(){
   const names=Object.keys(vendorSnaps).sort((a,b)=>vendorSnaps[b].at-vendorSnaps[a].at);
   if(names.length<2){ box.innerHTML=''; return; }
   const sel=vsnapSel.filter(x=>vendorSnaps[x]);
+  const wasOpen=!!(box.querySelector('details')||{}).open;   // 同上：勾選重繪不可把面板收起來
 
-  let h='<details class="card p-0"'+(sel.length>=2?' open':'')+'>'+
+  let h='<details class="card p-0"'+((wasOpen||sel.length>=2)?' open':'')+'>'+
     '<summary class="p-4 cursor-pointer flex items-center justify-between flex-wrap gap-2">'+
       '<div><div class="eyebrow">VENDOR COMPARE</div>'+
       '<h3 class="font-bold text-ink-900 mt-1">廠商對比</h3>'+
@@ -2618,7 +2633,7 @@ function renderVendorCompare(){
     const on=sel.indexOf(nm)>=0;
     h+='<label class="flex items-center gap-1.5 text-[11px] px-2 py-1.5 rounded-lg border cursor-pointer '+
       (on?'bg-jade-50 border-jade-300 text-jade-800 font-semibold':'bg-white hover:bg-slate-50 text-slate-600')+'">'+
-      '<input type="checkbox" '+(on?'checked':'')+' onchange="toggleVsnapSel('+JSON.stringify(nm)+',this.checked)">'+
+      '<input type="checkbox" '+(on?'checked':'')+' onchange="toggleVsnapSel('+jsArg(nm)+',this.checked)">'+
       '<span>'+esc(nm)+'</span></label>';
   });
   h+='</div>';
@@ -2886,7 +2901,7 @@ function renderCompare(){
     sections[g].forEach(k=>{
       const on=active.indexOf(k)>=0;
       t+='<label class="flex items-start gap-1.5 text-[11px] cursor-pointer hover:bg-slate-50 rounded px-1 py-0.5">'+
-        '<input type="checkbox" class="mt-0.5" '+(on?'checked':'')+' onchange="toggleCmpField(\''+k.replace(/'/g,"\\'")+'\',this.checked)">'+
+        '<input type="checkbox" class="mt-0.5" '+(on?'checked':'')+' onchange="toggleCmpField('+jsArg(k)+',this.checked)">'+
         '<span class="'+(on?'text-ink-900 font-medium':'text-slate-500')+'">'+esc(cmpLabel(k))+'</span></label>';
     });
     t+='</div></div>';
