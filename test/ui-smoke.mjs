@@ -172,6 +172,91 @@ assert.ok(cards[1].includes('廠商丙公司') && !cards[1].includes('得標丙�
   assert.ok(btn, '要有「補流標原因與預算變化」按鈕');
 }
 
+
+// ── 5. 機關洞察：前置公告雷達 ─────────────────────────────────────────
+{
+  const mk = (type, title, job, date) =>
+    ({ unit_id: 'U', unit_name: '測試機關', job_number: job, date, filename: job + date,
+       brief: { type, title, companies: { names: [], name_key: {} } } });
+  const today = new Date();
+  const ymd = d => d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+  const back = n => { const d = new Date(today); d.setDate(d.getDate() - n); return ymd(d); };
+
+  const records = [
+    // 五件已配對，用來算出這個機關的時間窗（間隔 20/24/28/40/45 天 → 中位數 28）
+    mk('招標文件公開閱覽公告資料公告', 'P1 技服', 'P1', '20260101'), mk('公開招標公告', 'P1 技服', 'P1', '20260121'),
+    mk('招標文件公開閱覽公告資料公告', 'P2 技服', 'P2', '20260201'), mk('公開招標公告', 'P2 技服', 'P2', '20260225'),
+    mk('公開徵求廠商提供參考資料',     'P3 採購', 'P3', '20260301'), mk('公開招標公告', 'P3 採購', 'P3', '20260329'),
+    mk('招標文件公開閱覽公告資料公告', 'P4 工程', 'P4', '20260401'), mk('公開招標公告', 'P4 工程', 'P4', '20260511'),
+    mk('招標文件公開閱覽公告資料公告', 'P5 工程', 'P5', '20260501'), mk('公開招標公告', 'P5 工程', 'P5', '20260615'),
+    // 活的機會：10 天前公開閱覽，還在推估區間內
+    mk('招標文件公開閱覽公告資料公告', '興達型 委託技術服務', 'LIVE', back(10)),
+    // 逾期的機會：100 天前公開閱覽，早就過了 Q3
+    mk('招標文件公開閱覽公告資料公告', '逾期型 委託技術服務', 'LATE', back(100)),
+    // 日期反常：招標公告早於前置公告
+    mk('招標文件公開閱覽公告資料公告', '反常型 工程', 'ODD', '20260801'),
+    mk('公開招標公告', '反常型 工程', 'ODD', '20260720'),
+    // 限制性招標含「公開徵求」字樣，不可被當成前置公告
+    mk('經公開評選或公開徵求之限制性招標公告', '限制性 技服', 'RESTRICT', '20260610')
+  ];
+
+  await page.evaluate(recs => {
+    unitData = { unit_id: 'U', unit_name: '測試機關', records: recs,
+                 total: recs.length, totalPages: 1, pagesFetched: 1, stop: { reason: 'done' } };
+    unitPeriod = 0;
+    // 只給 LIVE 那件補上詳情，驗證特定資格的紅框
+    localStorage.setItem('pi_pre_detail', JSON.stringify({ 'U|LIVE': {
+      budget: 564179175, level: '巨額', way: '限制性招標(經公開評選或公開徵求者)',
+      summary: '針對新機組設置提供整體規劃、設計、採購協助、施工、試運轉及商轉等技術服務工作。',
+      viewDate: '115/07/14-115/07/20', opinionDue: '115/07/23',
+      basic: '經中華民國政府機關核准設立之工程技術顧問公司。',
+      special: '投標廠商於截止投標日前二十年內具有1部44萬瓩(含)以上之發電機組規劃設計整合之經驗，且該機組業已商轉。',
+      at: Date.now() } }));
+    preDetail = JSON.parse(localStorage.getItem('pi_pre_detail'));
+    go('agencies');
+    renderAgencyDetail();
+  }, records);
+  await page.waitForTimeout(300);
+
+  const d = await page.textContent('#agencyDetail');
+  assert.ok(d.includes('前置公告雷達'), '機關洞察要出現前置公告雷達');
+  assert.ok(d.includes('前置公告 8 案'), '應為 8 案（限制性招標不算前置）：' + (d.match(/前置公告 \d+ 案/) || []));
+  assert.ok(d.includes('尚未招標 2 案'), 'LIVE 與 LATE 才是機會，ODD 不算：' + (d.match(/尚未招標 \d+ 案/) || []));
+  assert.ok(d.includes('中位數 28 天'), '時間窗中位數要是 28 天：' + (d.match(/中位數 \d+ 天[^）]*）/) || []));
+  assert.ok(!d.includes('限制性 技服'), '限制性招標不可出現在前置公告清單');
+
+  // 逾期的要有警示，還在區間內的不可有
+  assert.ok(/已超過推估區間 \d+ 天/.test(d), '逾期的案子要出現超期警示');
+  const live = await page.$$eval('#agencyDetail .rounded-xl', ns => ns.map(n => n.textContent));
+  const liveRow = live.find(t => t.includes('興達型'));
+  const lateRow = live.find(t => t.includes('逾期型'));
+  assert.ok(liveRow && !liveRow.includes('已超過推估區間'), '還在區間內的不可標成逾期：' + liveRow);
+  assert.ok(lateRow && lateRow.includes('已超過推估區間'), '逾期的要標：' + lateRow);
+
+  // 日期反常自成一區，且不顯示成「已過 N 天還沒招標」
+  assert.ok(d.includes('日期對不起來 1 案'), '反常的要自成一區');
+  const oddRow = live.find(t => t.includes('反常型'));
+  assert.ok(oddRow && oddRow.includes('早於前置公告'), '反常的要說清楚原因：' + oddRow);
+  assert.ok(oddRow && !/已過 \d+ 天/.test(oddRow), '反常的不可顯示成還在等招標：' + oddRow);
+
+  // 特定資格要以紅框突出，並帶出門檻數字
+  assert.ok(liveRow.includes('特定資格（門檻在這裡）'), '要有特定資格區塊');
+  assert.ok(liveRow.includes('44萬瓩'), '特定資格要帶出門檻數字');
+  assert.ok(liveRow.includes('5.64 億') || liveRow.includes('億'), '要顯示預算：' + liveRow.slice(0, 300));
+
+  // 真的點開「已進入招標」摺疊區
+  const sums = await page.$$('#agencyDetail details summary');
+  const hit = [];
+  for (const s of sums) { if ((await s.textContent()).includes('已進入招標')) hit.push(s); }
+  assert.equal(hit.length, 1, '應該有一個「已進入招標」摺疊區');
+  await hit[0].click();
+  await page.waitForTimeout(150);
+  assert.ok((await page.textContent('#agencyDetail')).includes('P1 技服'), '展開後要看到校準用的案子');
+
+  const btn = await page.$('#agencyDetail button[onclick*="fillPreDetail"]');
+  assert.ok(btn, '要有「補預算與資格條款」按鈕');
+}
+
 // CDN 載不到是離線環境的事，不算程式錯
 const real = errs.filter(e => !/tailwind|Failed to load resource/i.test(e));
 assert.equal(real.length, 0, '頁面有錯誤：\n' + real.join('\n'));

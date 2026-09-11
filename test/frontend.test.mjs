@@ -791,3 +791,85 @@ test('flopSeries 串出流標序列，並分出成案與未成案', () => {
   assert.equal(by.D.settled, false, '契約變更不能當成案');
   assert.equal(by.D.title, 'D 案', '標題取自流標公告，不是契約變更那則');
 });
+
+/* 這些公告類型名稱都是實際存在的變體（2026-09 實測），刻意混進容易誤判的鄰居 */
+test('前置公告的類型判斷認得所有變體，也不誤收招標與決標', () => {
+  const 公開閱覽 = ['招標文件公開閱覽公告資料公告', '招標文件公開閱覽公告資料'];
+  const 公開徵求 = ['公開徵求廠商提供參考資料公告', '公開徵求廠商提供參考資料'];
+  const 更正 = ['招標文件公開閱覽公告資料更正公告', '公開徵求廠商提供參考資料更正公告'];
+  const 不是前置 = ['公開招標公告', '公開取得報價單或企劃書公告', '決標公告',
+                   '無法決標公告', '經公開評選或公開徵求之限制性招標公告', '定期彙送'];
+  公開閱覽.forEach(t => { assert.equal(app.isPreview(t), true, t); assert.equal(app.isPreTender(t), true, t); });
+  公開徵求.forEach(t => { assert.equal(app.isRFI(t), true, t); assert.equal(app.isPreTender(t), true, t); });
+  更正.forEach(t => assert.equal(app.isPreTender(t), false, '更正公告不另計一次：' + t));
+  不是前置.forEach(t => assert.equal(app.isPreTender(t), false, t));
+  // 「經公開評選或公開徵求之限制性招標公告」含「公開徵求」四個字，但它是招標公告
+  assert.equal(app.isRFI('經公開評選或公開徵求之限制性招標公告'), false,
+    '限制性招標含「公開徵求」字樣，不可誤判成 RFI');
+  assert.equal(app.isTender('經公開評選或公開徵求之限制性招標公告'), true);
+  // 前置公告不可被算進招標數
+  公開閱覽.concat(公開徵求).forEach(t => assert.equal(app.isTender(t), false, '前置公告不是招標：' + t));
+});
+
+test('splitQual 拆出特定資格，沒有特定資格時回空字串', () => {
+  // 興達電廠第二期更新改建計畫委託技術服務（6331400023a）公開閱覽公告原文
+  const real = '基本資格:經中華民國政府機關核准設立之工程技術顧問公司，並加入全國商業同業公會或地方同業公會、納稅證明、信用證明。 特定資格:投標廠商於截止投標日前二十年內具有1部44萬瓩(含)以上之發電機組規劃設計整合之經驗，且該機組業已商轉，或前述期間累積110萬瓩(含)以上發電機組規劃設計整合之經驗，且該機組業已商轉。';
+  const q = app.splitQual(real);
+  assert.ok(q.special.indexOf('44萬瓩') >= 0, '特定資格要含門檻數字：' + q.special);
+  assert.ok(q.special.indexOf('基本資格') < 0, '特定資格不可含基本資格那段');
+  assert.ok(q.basic.indexOf('工程技術顧問公司') >= 0);
+  assert.ok(q.basic.indexOf('44萬瓩') < 0, '基本資格不可含特定資格那段');
+
+  const onlyBasic = app.splitQual('基本資格：具公司登記或商業登記、納稅證明。');
+  assert.equal(onlyBasic.special, '', '沒有特定資格要回空字串，這本身是門檻低的訊號');
+  assert.ok(onlyBasic.basic.indexOf('公司登記') >= 0);
+  assert.equal(JSON.stringify(app.splitQual('')), JSON.stringify({ basic: '', special: '' }));
+});
+
+test('preTenderList 配對前置公告與招標，並標出反常資料', () => {
+  const mk = (type, title, job, date) => ({ job_number: job, date, brief: { type, title } });
+  const recs = [
+    // A：公開閱覽 → 34 天後招標 → 決標（實測協和 LNG 那件的形狀）
+    mk('招標文件公開閱覽公告資料公告', 'A 技術服務', 'A', '20260701'),
+    mk('經公開評選或公開徵求之限制性招標公告', 'A 技術服務', 'A', '20260804'),
+    mk('決標公告', 'A 技術服務', 'A', '20260930'),
+    // B：公開閱覽，至今未招標（實測興達那件的形狀）
+    mk('招標文件公開閱覽公告資料公告', 'B 委託技術服務', 'B', '20260714'),
+    // C：公開徵求 → 招標
+    mk('公開徵求廠商提供參考資料', 'C 設備採購', 'C', '20260601'),
+    mk('公開招標公告', 'C 設備採購', 'C', '20260615'),
+    // D：招標日早於前置公告日 —— 實測有這種反常資料
+    mk('招標文件公開閱覽公告資料公告', 'D 工程', 'D', '20260801'),
+    mk('公開招標公告', 'D 工程', 'D', '20260720'),
+    // E：沒有前置公告，不該進清單
+    mk('公開招標公告', 'E 工程', 'E', '20260101'),
+    mk('決標公告', 'E 工程', 'E', '20260301')
+  ];
+  const rows = app.preTenderList(recs);
+  assert.equal(rows.length, 4, '只有帶前置公告的案號才進清單（E 不該在）');
+  assert.equal(rows[0].job, 'B', '真正還沒招標的排最前面（D 的日期反常，不算機會）');
+  assert.equal(rows[0].tenderDate, null);
+  assert.equal(rows[0].odd, false);
+  assert.equal(rows[0].kind, '公開閱覽');
+
+  const by = {}; rows.forEach(r => { by[r.job] = r; });
+  assert.equal(by.A.gap, 34, '2026/07/01 → 08/04 是 34 天');
+  assert.equal(by.A.awardDate, '20260930');
+  assert.equal(by.A.odd, false);
+  assert.equal(by.C.kind, '公開徵求');
+  assert.equal(by.C.gap, 14);
+  // D 的招標早於前置公告 → 不可配成 −12 天的間隔
+  assert.equal(by.D.tenderDate, null, '前置公告之前的招標不可被配對');
+  assert.equal(by.D.gap, null);
+  assert.equal(by.D.odd, true, '要標成日期反常');
+  assert.equal(by.D.oddTenderDate, '20260720');
+  assert.equal(by.D.waiting, null, '日期反常的不可顯示成「已過 N 天還沒招標」');
+});
+
+test('preLeadStats 樣本不足不給推估，反常值不入統計', () => {
+  const rows = [{ gap: 20 }, { gap: 28 }, { gap: 40 }, { gap: -12 }, { gap: 900 }, { gap: null }];
+  const st = app.preLeadStats(rows);
+  assert.equal(st.n, 3, '負值與超過 400 天的都要剔除');
+  assert.equal(st.med, 28);
+  assert.equal(app.preLeadStats([{ gap: null }]), null, '完全沒有可用樣本要回 null');
+});
