@@ -416,31 +416,107 @@ test('用真實類型分布驗證決標數不再虛增', () => {
     '這是舊的「只看決標」寫法會撈到的量，用來對照');
 });
 
-test('buildVendorSnap 算出決標件數、機關分布與共同投標夥伴', () => {
-  const SELF1 = '中興工程顧問股份有限公司 (Sinotech Engineering Consultants, Ltd.)';
-  const SELF2 = '中興工程顧問股份有限公司';
-  const PARTNER = '杜風工程顧問有限公司';
-  const mk = (t, agency, names) => ({ u:'U', n:agency, d:'20260301', j:'J', t, ti:'案', c:names });
+/* 這三筆 name_key 是 2026-09 從 pcc-api 抓下來的原文，不是編的。
+   案號 6331300004「台中電廠第二期新建燃氣機組計畫-電廠工程委託技術服務」，
+   台電核能火力發電工程處。泰興投標落標、吉興投標得標，兩家都列在 names 裡，
+   第三個名字只是泰興自己的英文名。 */
+const REAL_6331300004 = {
+  names: [
+    '泰興工程顧問股份有限公司 (PACIFIC ENGINEERS & CONSTRUCTORS LTD.)',
+    '吉興工程顧問股份有限公司 (GIBSIN Engineers, Ltd.)',
+    'PACIFIC ENGINEERS & CONSTRUCTORS LTD.'
+  ],
+  name_key: {
+    'PACIFIC ENGINEERS & CONSTRUCTORS LTD.': ['英文公告:廠商名稱'],
+    '吉興工程顧問股份有限公司 (GIBSIN Engineers, Ltd.)':
+      ['投標廠商:投標廠商2:廠商名稱', '決標品項:第1品項:得標廠商1:得標廠商'],
+    '泰興工程顧問股份有限公司 (PACIFIC ENGINEERS & CONSTRUCTORS LTD.)':
+      ['投標廠商:投標廠商1:廠商名稱', '決標品項:第1品項:未得標廠商1:未得標廠商']
+  }
+};
+const TAI = REAL_6331300004.names[0];
+const GIB = REAL_6331300004.names[1];
+
+test('splitCompanies 用 name_key 分出勝負，並濾掉自己的英文名', () => {
+  const out = app.splitCompanies(REAL_6331300004.names, REAL_6331300004.name_key);
+  assert.equal(out.length, 2, '純英文名變體不可被當成第三家廠商');
+  assert.equal(JSON.stringify(out.map(o => [o.name, o.won, o.lost])),
+    JSON.stringify([[TAI, false, true], [GIB, true, false]]),
+    '泰興落標、吉興得標');
+});
+
+test('recVendors 只回得標者，recBidders 回全部投標者', () => {
+  const rec = { brief: { type: '決標公告', companies: REAL_6331300004 } };
+  assert.equal(JSON.stringify(app.recVendors(rec)), JSON.stringify([GIB]),
+    '得標統計不可把落標的泰興算進來');
+  assert.equal(JSON.stringify(app.recBidders(rec)), JSON.stringify([TAI, GIB]),
+    '顯示與比對要看得到所有投標廠商');
+});
+
+test('多品項一項得標一項落標，算得標', () => {
+  // 2026-09-01「更正決標公告」實際資料：威農同一案有的品項得標、有的落標
+  const names = ['威農農業資材行', '宏茂行'];
+  const name_key = {
+    '威農農業資材行': ['投標廠商:投標廠商6:廠商名稱',
+      '決標品項:第1品項:得標廠商1:得標廠商', '決標品項:第14品項:未得標廠商2:未得標廠商'],
+    '宏茂行': ['投標廠商:投標廠商7:廠商名稱', '決標品項:第3品項:未得標廠商2:未得標廠商']
+  };
+  const out = app.splitCompanies(names, name_key);
+  assert.equal(JSON.stringify(out.map(o => [o.name, o.won, o.lost])),
+    JSON.stringify([['威農農業資材行', true, true], ['宏茂行', false, true]]));
+  assert.equal(JSON.stringify(app.winnersOf(out)), JSON.stringify(['威農農業資材行']));
+});
+
+test('共同投標得標的廠商也要算得標', () => {
+  const name_key = { '甲工程': ['決標品項:第1品項:得標廠商1(共同投標廠商):得標廠商'] };
+  const out = app.splitCompanies(['甲工程'], name_key);
+  assert.equal(out[0].won, true, '(共同投標廠商) 後綴不可讓得標判斷失效');
+  assert.equal(out[0].joint, true);
+});
+
+test('拒絕往來公告的廠商掛在標案內容，不能用得標欄位去撈', () => {
+  // 2026-09-01 實際資料：僑邦室內裝修有限公司，key 是「標案內容:廠商名稱」
+  const rec = { date: '20260901', job_number: 'X1',
+    brief: { type: '拒絕往來廠商名單公告', title: '停權',
+      companies: { names: ['僑邦室內裝修有限公司'],
+                   name_key: { '僑邦室內裝修有限公司': ['標案內容:廠商名稱'] } } } };
+  assert.equal(app.recVendors(rec).length, 0, '這種公告沒有得標廠商');
+  const list = app.debarredList([rec]);
+  assert.equal(list.length, 1);
+  assert.equal(JSON.stringify(list[0].vendors), JSON.stringify(['僑邦室內裝修有限公司']),
+    '拒絕往來名單必須列得出當事廠商');
+});
+
+test('完全沒有 name_key 時退回列出全部，而不是靜靜變空', () => {
+  const rec = { brief: { type: '決標公告', companies: { names: ['甲', '乙'] } } };
+  assert.equal(JSON.stringify(app.recVendors(rec)), JSON.stringify(['甲', '乙']));
+});
+
+test('buildVendorSnap 把共同得標夥伴與同場競標對手分開算', () => {
+  const SELF = '泰興工程顧問';
+  const mk = (t, agency, c, w) => ({ u:'U', n:agency, d:'20260301', j:'J', t, ti:'案', c, w });
   const recs = [
-    mk('決標公告','台北市政府',[SELF1, SELF2, PARTNER]),   // 自己出現兩種寫法 + 一個夥伴
-    mk('決標公告','台北市政府',[SELF2]),
-    mk('決標公告','新北市政府',[SELF2, PARTNER]),
-    mk('更正決標公告','台北市政府',[SELF2]),                // 不算決標
-    mk('更正無法決標公告','台北市政府',[]),                  // 不算決標
-    mk('定期彙送','雜訊機關',[]),                            // 不算決標
-    mk('無法決標公告','台北市政府',[])                       // 不算決標
+    mk('決標公告','台電核火處',[TAI, GIB],[GIB]),        // 自己落標，吉興得標 → 對手
+    mk('決標公告','台電核火處',[TAI, '甲顧問'],[TAI]),    // 自己得標，甲落標 → 對手
+    mk('決標公告','水利署',[TAI, '乙顧問'],[TAI, '乙顧問']), // 一起得標 → 夥伴
+    mk('更正決標公告','台電核火處',[TAI],[TAI]),          // 不算決標
+    mk('無法決標公告','台電核火處',[TAI],[])              // 不算決標
   ];
-  const sn = app.buildVendorSnap('中興工程顧問', { recs, total:4681, tp:47, pages:3 });
-  assert.equal(sn.awards, 3, '只有 3 筆真決標');
-  assert.equal(sn.corrections, 2, '更正決標與更正無法決標都算更正');
-  assert.equal(sn.fetched, 7);
-  assert.equal(sn.total, 4681);
-  // 跨 realm：用 JSON 比較，不用 deepEqual（見檔頭說明）
-  assert.equal(JSON.stringify(sn.agencies), JSON.stringify([['台北市政府',2],['新北市政府',1]]),
-    '機關統計只看真決標');
-  assert.equal(JSON.stringify(sn.partners), JSON.stringify([[PARTNER,2]]),
-    '自己不可被算成夥伴，且同一案只算一次');
-  assert.ok(sn.partners.every(x => x[0].indexOf('中興') < 0), '含英文後綴的自己也要排除');
+  const sn = app.buildVendorSnap(SELF, { recs, total:553, tp:6, pages:3 });
+  assert.equal(sn.awards, 2, '只有真的得標的才算件數');
+  assert.equal(sn.lostCases, 1, '同場落標要單獨算出來');
+  assert.equal(JSON.stringify(sn.agencies),
+    JSON.stringify([['台電核火處',1],['水利署',1]]), '機關只看得標的案子');
+  assert.equal(JSON.stringify(sn.partners), JSON.stringify([['乙顧問',1]]),
+    '夥伴只能是同案一起得標的');
+  assert.equal(JSON.stringify(sn.rivals),
+    JSON.stringify([['吉興工程顧問股份有限公司',1],['甲顧問',1]]),
+    '吉興是對手不是夥伴');
+  assert.ok(sn.partners.every(x => x[0].indexOf('泰興') < 0), '自己不可算成夥伴');
+  assert.ok(sn.rivals.every(x => x[0].indexOf('泰興') < 0), '自己不可算成對手');
+  assert.equal(sn.recent.length, 2, '最近得標只列真的得標的');
+  assert.equal(sn.corrections, 1);
+  assert.equal(sn.fetched, 5);
 });
 
 test('gateBlock 標出投標門檻，沒門檻時明說沒有', () => {

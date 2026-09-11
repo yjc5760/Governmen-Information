@@ -441,11 +441,13 @@ function warnQuota(k,label){
   toast('儲存空間已滿，'+(label||'這筆變更')+'沒有存到（重開會不見）。請先「匯出備份」，再到頁尾「清除全部資料」或減少同步天數。','error');
 }
 const K = { BASE:'pi_api_base', TOKEN:'pi_api_token',
-  DAYCACHE:'pi_daycache', TRACKED:'pi_tracked', COMPARE:'pi_compare',
+  DAYCACHE:'pi_daycache2', TRACKED:'pi_tracked', COMPARE:'pi_compare',
   PROXY:'pi_proxy_base', WATCH:'pi_watch_keywords', AMOUNT:'pi_amount_cache',
   AGENCY:'pi_agency_index', CMPVIEW:'pi_compare_view',
   SNAP:'pi_agency_snap', SNAPSEL:'pi_agency_snap_sel',
-  RIVALS:'pi_rivals', VSNAP:'pi_vendor_snap', VSNAPSEL:'pi_vendor_snap_sel' };
+  RIVALS:'pi_rivals', VSNAP:'pi_vendor_snap2', VSNAPSEL:'pi_vendor_snap_sel' };
+/* 舊版快取沒有得標／未得標的判讀資料，留著只會繼續給錯數字又佔配額，開頁就清掉。 */
+['pi_daycache','pi_vendor_snap'].forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
 
 /* pcc-viewer 公開設定檔裡的那組 token 已被 API 端擋掉（回 403）。
    openfun 這支 API 目前不帶 token 也能公開查詢，所以預設不送 Authorization。
@@ -847,8 +849,15 @@ async function syncDays(){
     bar.textContent='同步中… '+(i+1)+' / '+n+'（'+key+'）';
     try{
       const r=await api('/api/listbydate?date='+key);
-      const recs=(r.records||[]).map(x=>({u:x.unit_id,n:x.unit_name,j:x.job_number,t:(x.brief&&x.brief.title)||'',ty:(x.brief&&x.brief.type)||'',f:x.filename||'',
-        c:(x.brief&&x.brief.companies&&x.brief.companies.names)||[]}));
+      const recs=(r.records||[]).map(x=>{
+        const cos=splitCompanies((x.brief&&x.brief.companies&&x.brief.companies.names)||[],
+                                 x.brief&&x.brief.companies&&x.brief.companies.name_key);
+        const names=cos.map(o=>o.name);
+        // w 存索引而不是名字，同一份名單不重複佔配額；undefined 代表舊快取、判不出勝負
+        const w=[]; cos.forEach((o,i)=>{ if(o.won) w.push(i); });
+        return {u:x.unit_id,n:x.unit_name,j:x.job_number,t:(x.brief&&x.brief.title)||'',
+                ty:(x.brief&&x.brief.type)||'',f:x.filename||'', c:names, w:w};
+      });
       recs.forEach(z=>noteAgency(z.u,z.n));
       dayCache[key]=recs; got+=recs.length;
     }catch(e){ fail++; }
@@ -1174,14 +1183,20 @@ function tenderCard(x){
   const el=document.createElement('div');
   el.className='card p-4 border-l-4 border-amber-400 cursor-pointer hover:shadow-md transition';
   const brief=x.brief||{};
-  const companies=(brief.companies&&brief.companies.names)||[];
+  const cos=splitCompanies(brief.companies&&brief.companies.names, brief.companies&&brief.companies.name_key);
+  // x.winners 由快取帶入（已在同步時分好）；沒帶就現場用 name_key 分
+  const hasKey=(x.winners!=null)||cos.some(o=>o.known);
+  const winners=(x.winners!=null)?x.winners:cos.filter(o=>o.won).map(o=>o.name);
+  const companies=winners.length?winners:cos.map(o=>o.name);
+  // 分不出勝負時只寫「廠商」，不要假裝知道誰得標
+  const coLabel=winners.length?'得標':(hasKey?'投標廠商':'廠商');
   el.onclick=()=>openTender(x.unit_id,x.job_number,x.unit_name,brief.title);
   el.innerHTML=
     '<div class="flex flex-wrap gap-1.5 mb-2">'+typeTag(brief.type)+(x.date?'<span class="tag bg-slate-50 text-slate-500">'+esc(x.date)+'</span>':'')+'</div>'+
     '<div class="text-xs text-jade-700 font-semibold"><i class="fa-solid fa-building-columns mr-1"></i>'+esc(x.unit_name)+'</div>'+
     '<div class="text-[15px] font-bold text-ink-900 mt-1 leading-snug">'+esc(brief.title)+'</div>'+
     '<div class="text-[11px] text-slate-400 mt-2 font-mono">'+esc(x.job_number)+'</div>'+
-    (companies.length?'<div class="text-[11px] text-slate-600 mt-2"><i class="fa-solid fa-user-tie mr-1 text-slate-400"></i>'+esc(companies.slice(0,3).join('、'))+(companies.length>3?' 等 '+companies.length+' 家':'')+'</div>':'');
+    (companies.length?'<div class="text-[11px] text-slate-600 mt-2"><i class="fa-solid fa-user-tie mr-1 text-slate-400"></i><span class="text-slate-400 mr-1">'+coLabel+'</span>'+esc(companies.slice(0,3).join('、'))+(companies.length>3?' 等 '+companies.length+' 家':'')+'</div>':'');
   return el;
 }
 function renderPager(page,total){
@@ -1496,7 +1511,51 @@ let unitData=null, unitPeriod=5, unitSort='count', unitVendorQ='', fillAbort=fal
 function recDate(r){ const s=String(r.date||''); if(s.length!==8) return null;
   return new Date(+s.slice(0,4),+s.slice(4,6)-1,+s.slice(6)); }
 function recTy(r){ return (r.brief&&r.brief.type)||''; }
-function recVendors(r){ return ((r.brief&&r.brief.companies&&r.brief.companies.names)||[]).map(n=>String(n||'').trim()).filter(Boolean); }
+/* ---------- 得標／未得標判讀 ----------
+   brief.companies.names 列的是「這一案出現過的所有廠商」，不是得標名單。
+   同一份 brief.companies 裡的 name_key 記錄每個名字是從詳細資料哪些欄位抓來的，
+   據此就能分辨勝負，不必再打一次 API：
+     決標品項:第N品項:得標廠商N:得標廠商               → 得標
+     決標品項:第N品項:得標廠商N(共同投標廠商):得標廠商 → 共同投標且得標
+     決標品項:第N品項:未得標廠商N:未得標廠商           → 未得標
+     投標廠商:投標廠商N:廠商名稱                       → 只知道有投標
+     標案內容:廠商名稱                                 → 拒絕往來公告的當事廠商
+     英文公告:廠商名稱                                 → 同一家的英文名，不是另一家
+   實測 2026-09-01 全日 624 則決標公告：1,169 個名字裡只有 725 家真的得標、
+   417 家落標，舊寫法（names 全算得標）把得標件數灌水 61%。
+   多品項的案子同一家可能一項得標、另一項落標（實測有），所以只要有一個純得標
+   的欄位就算得標。 */
+function keyIsWin(k){ k=String(k||''); return k.indexOf('未得標廠商')<0 && k.indexOf('得標廠商')>=0; }
+function keyIsLose(k){ return String(k||'').indexOf('未得標廠商')>=0; }
+function keyIsEng(k){ return String(k||'').indexOf('英文公告')>=0; }
+function keyIsJoint(k){ return String(k||'').indexOf('共同投標廠商')>=0; }
+
+/* names + name_key → [{name,known,won,lost,joint}]，純英文名變體會被濾掉。 */
+function splitCompanies(names, nameKey){
+  const nk=nameKey||{}, out=[], seen={};
+  (names||[]).forEach(n0=>{
+    const n=String(n0||'').trim(); if(!n||seen[n]) return; seen[n]=1;
+    const keys=nk[n]||[];
+    if(keys.length && keys.every(keyIsEng)) return;
+    out.push({ name:n, known:keys.length>0,
+               won:keys.some(keyIsWin), lost:keys.some(keyIsLose),
+               joint:keys.some(keyIsJoint) });
+  });
+  return out;
+}
+function recCompanies(r){
+  const c=(r&&r.brief&&r.brief.companies)||{};
+  return splitCompanies(c.names, c.name_key);
+}
+/* 真正得標的廠商。完全沒有 name_key 可判讀時退回列出全部（舊資料），
+   有判讀資料但這案沒人得標就回空陣列，不要硬湊。 */
+function winnersOf(list){
+  const won=list.filter(x=>x.won);
+  if(won.length) return won.map(x=>x.name);
+  return list.some(x=>x.known) ? [] : list.map(x=>x.name);
+}
+function recVendors(r){ return winnersOf(recCompanies(r)); }      // 得標廠商，統計用
+function recBidders(r){ return recCompanies(r).map(x=>x.name); }  // 所有廠商，顯示與比對用
 function vendorShort(n){ return String(n||'').replace(/\s*[（(][^）)]*[）)]\s*$/,''); }
 function amtKey(job){ return unitData.unit_id+'|'+job; }
 function amtOf(job){ const c=amountCache[amtKey(job)]; return (c&&c.a)||0; }
@@ -1695,7 +1754,7 @@ function ratioStats(rows){
 function debarredList(recs){
   return recs.filter(r=>recTy(r).indexOf('拒絕往來')>=0)
     .map(r=>({ date:r.date, title:(r.brief&&r.brief.title)||'', job:r.job_number,
-               vendors:recVendors(r), correction:recTy(r).indexOf('更正')>=0 }))
+               vendors:recBidders(r), correction:recTy(r).indexOf('更正')>=0 }))
     .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
 }
 
@@ -2409,12 +2468,14 @@ function renderMarketRanking(){
   });
 }
 /* ================= 對手常駐追蹤與廠商對比 =================
-   searchbycompanyname 每頁只有 20 筆（中興工程顧問實測 4,681 筆、47 頁），
-   所以不可能抓全。這裡預設每家抓 3 頁（60 筆），目的是看「最近在幹什麼」，
-   不是統計全歷史——所有數字都標明是抓取範圍內的。
-   回傳的 brief.companies.names 會列出該案所有得標廠商，包含共同投標的夥伴，
-   所以順便算得出「常見合作夥伴」。 */
+   searchbycompanyname 每頁 100 筆（中興工程顧問實測 4,681 筆、47 頁；
+   泰興工程顧問 553 筆、6 頁），所以不可能抓全。這裡預設每家抓 3 頁（300 筆），
+   目的是看「最近在幹什麼」，不是統計全歷史——所有數字都標明是抓取範圍內的。
+   注意 brief.companies.names 是該案「所有投標廠商」，得標落標都在裡面，
+   要靠 name_key 分（見 splitCompanies）。分完才有辦法區分
+   「一起得標的夥伴」和「同場競標的對手」——這兩件事以前被混成一項。 */
 const RIVAL_PAGES = 3;
+const RIVAL_PER_PAGE = 100;   // 實測值，不是 20
 const RIVAL_PAGE_GAP = 400;
 const VSNAP_MAX = 20;
 const RIVAL_SUGGEST = ['中興工程顧問','台灣世曦工程顧問','亞新工程顧問','中鼎工程','泰興工程顧問','聯邦工程顧問'];
@@ -2437,9 +2498,12 @@ async function fetchVendor(name,pages,say){
     const rows=r.records||[];
     rows.forEach(x=>{
       noteAgency(x.unit_id,x.unit_name);
+      const cos=splitCompanies((x.brief&&x.brief.companies&&x.brief.companies.names)||[],
+                               x.brief&&x.brief.companies&&x.brief.companies.name_key);
       recs.push({ u:x.unit_id, n:x.unit_name, d:String(x.date||''), j:x.job_number,
                   t:(x.brief&&x.brief.type)||'', ti:(x.brief&&x.brief.title)||'',
-                  c:((x.brief&&x.brief.companies&&x.brief.companies.names)||[]) });
+                  c:cos.map(o=>o.name),                     // 所有投標廠商
+                  w:cos.filter(o=>o.won).map(o=>o.name) }); // 其中真正得標的
     });
     if(!rows.length || (tp && p>=tp)) break;
     if(p<pages) await new Promise(s=>setTimeout(s,RIVAL_PAGE_GAP));
@@ -2448,27 +2512,41 @@ async function fetchVendor(name,pages,say){
   return { recs, total, tp, pages:Math.min(p,pages) };
 }
 
+/* 一則決標公告裡這家廠商可能是得標的，也可能只是落標的陪標廠商。
+   分開之後才有三件不同的事可講：
+     awards   實際得標件數（以前把落標也算進來）
+     partners 同一案「一起得標」的別家＝真正的共同投標夥伴
+     rivals   同一案出現、但不是一起得標的別家＝同場競標的對手
+   以前只有一項 partners，而且吃的是全部廠商名單，所以把對手當成了夥伴。 */
 function buildVendorSnap(name,res){
   const awards=res.recs.filter(r=>isAward(r.t));
-  const agencies={}, partners={}, years={};
-  awards.forEach(r=>{
+  const wonHere=r=>(r.w||[]).some(o=>sameVendor(o,name));
+  const won=awards.filter(wonHere);
+  const lost=awards.filter(r=>!wonHere(r) && (r.c||[]).some(o=>sameVendor(o,name)));
+  const agencies={}, partners={}, rivals={}, years={};
+  const bump=(obj,r,list,skipWinners)=>{
+    const seen={};
+    (list||[]).forEach(o=>{
+      if(sameVendor(o,name)) return;                                  // 排除自己
+      if(skipWinners && (r.w||[]).some(w=>sameVendor(w,o))) return;   // 已算進夥伴
+      const k=vendorShort(o); if(!k||seen[k]) return; seen[k]=1;
+      obj[k]=(obj[k]||0)+1;
+    });
+  };
+  won.forEach(r=>{
     if(r.n) agencies[r.n]=(agencies[r.n]||0)+1;
     const y=r.d.slice(0,4); if(y) years[y]=(years[y]||0)+1;
-    const seen={};
-    (r.c||[]).forEach(o=>{
-      if(sameVendor(o,name)) return;               // 排除自己
-      const k=vendorShort(o); if(!k||seen[k]) return; seen[k]=1;
-      partners[k]=(partners[k]||0)+1;
-    });
+    bump(partners, r, r.w, false);
   });
+  awards.forEach(r=>bump(rivals, r, r.c, wonHere(r)));
   const top=(obj,k)=>Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,k);
   return {
     name, at:Date.now(), total:res.total, tp:res.tp, pages:res.pages,
-    fetched:res.recs.length, awards:awards.length,
+    fetched:res.recs.length, awards:won.length, lostCases:lost.length,
     corrections:res.recs.filter(r=>String(r.t).indexOf('更正')>=0).length,
-    agencies:top(agencies,30), partners:top(partners,15),
+    agencies:top(agencies,30), partners:top(partners,15), rivals:top(rivals,15),
     years:Object.entries(years).sort(),
-    recent:awards.slice(0,8).map(r=>({d:r.d,n:r.n,ti:r.ti}))
+    recent:won.slice(0,8).map(r=>({d:r.d,n:r.n,ti:r.ti}))
   };
 }
 
@@ -2566,7 +2644,8 @@ function renderRivals(){
       '<div class="flex items-start justify-between gap-2 flex-wrap">'+
         '<div class="min-w-0"><div class="text-sm font-bold text-ink-900">'+esc(name)+'</div>'+
         (sn?('<div class="text-[11px] text-slate-500 mt-0.5">官方共 '+fmtNum(sn.total)+' 筆'+
-             (sn.tp?('（'+sn.tp+' 頁）'):'')+' · 已抓 '+fmtNum(sn.fetched)+' 筆 · 其中決標 '+fmtNum(sn.awards)+' 件 · 快照 '+
+             (sn.tp?('（'+sn.tp+' 頁）'):'')+' · 已抓 '+fmtNum(sn.fetched)+' 筆 · 得標 '+fmtNum(sn.awards)+' 件'+
+             (sn.lostCases?(' · 落標 '+fmtNum(sn.lostCases)+' 件'):'')+' · 快照 '+
              new Date(sn.at).toLocaleDateString('zh-TW')+'</div>')
             :'<div class="text-[11px] text-slate-400 mt-0.5">還沒抓過</div>')+
         '</div>'+
@@ -2581,10 +2660,14 @@ function renderRivals(){
           '<div><div class="text-[11px] font-semibold text-slate-600 mb-1">主要機關</div><div class="space-y-0.5">'+
           sn.agencies.slice(0,4).map(([a,c])=>'<div class="flex justify-between text-[11px] gap-2"><span class="truncate text-slate-700">'+esc(vendorShort(a))+'</span><span class="font-bold text-jade-700 flex-shrink-0">'+c+'</span></div>').join('')+
           '</div></div>'+
-          '<div><div class="text-[11px] font-semibold text-slate-600 mb-1">常見共同投標夥伴</div>'+
+          '<div><div class="text-[11px] font-semibold text-slate-600 mb-1">共同得標夥伴 <span class="font-normal text-slate-400">同案一起得標</span></div>'+
           (sn.partners.length?('<div class="space-y-0.5">'+sn.partners.slice(0,4).map(([a,c])=>'<div class="flex justify-between text-[11px] gap-2"><span class="truncate text-slate-700">'+esc(a)+'</span><span class="font-bold text-slate-500 flex-shrink-0">'+c+'</span></div>').join('')+'</div>')
-                            :'<div class="text-[11px] text-slate-400">抓取範圍內沒有共同投標</div>')+
-          '</div></div>';
+                            :'<div class="text-[11px] text-slate-400">抓取範圍內沒有共同得標</div>')+
+          '</div></div>'+
+          '<div class="mt-2"><div class="text-[11px] font-semibold text-slate-600 mb-1">常同場競標對手 <span class="font-normal text-slate-400">同案出現但不是一起得標</span></div>'+
+          ((sn.rivals&&sn.rivals.length)?('<div class="grid sm:grid-cols-2 gap-x-3 gap-y-0.5">'+sn.rivals.slice(0,6).map(([a,c])=>'<div class="flex justify-between text-[11px] gap-2"><span class="truncate text-slate-700">'+esc(a)+'</span><span class="font-bold text-rose-500 flex-shrink-0">'+c+'</span></div>').join('')+'</div>')
+                            :'<div class="text-[11px] text-slate-400">抓取範圍內沒有同場競標的別家</div>')+
+          '</div>';
       }
       if(sn.recent.length){
         h+='<details class="mt-2.5"><summary class="text-[11px] font-semibold text-slate-600 cursor-pointer">最近得標 '+sn.recent.length+' 筆</summary>'+
@@ -2603,13 +2686,16 @@ function renderRivals(){
 const VSNAP_ROWS = [
   ['官方總筆數',   s=>fmtNum(s.total), 'num'],
   ['已抓取',       s=>fmtNum(s.fetched)+' 筆（'+s.pages+' / '+(s.tp||'?')+' 頁）', 'text'],
-  ['決標件數',     s=>fmtNum(s.awards), 'num'],
+  ['得標件數',     s=>fmtNum(s.awards), 'num'],
+  ['落標件數',     s=>s.lostCases==null?'—':fmtNum(s.lostCases), 'high-bad'],
+  ['抓取範圍內得標率', s=>{ const t=s.awards+(s.lostCases||0); return t?pct1(s.awards/t):'—'; }, 'num'],
   ['更正公告',     s=>fmtNum(s.corrections), 'num'],
   ['涉及機關數',   s=>fmtNum(s.agencies.length), 'num'],
   ['最大機關佔比', s=>{ const t=s.agencies.reduce((a,x)=>a+x[1],0); return (t&&s.agencies.length)?pct1(s.agencies[0][1]/t):'—'; }, 'high-bad'],
   ['前三大機關',   s=>s.agencies.slice(0,3).map(x=>esc(vendorShort(x[0]))+'('+x[1]+')').join('<br>')||'—', 'text'],
-  ['共同投標夥伴數', s=>fmtNum(s.partners.length), 'num'],
+  ['共同得標夥伴數', s=>fmtNum(s.partners.length), 'num'],
   ['前三大夥伴',   s=>s.partners.slice(0,3).map(x=>esc(x[0])+'('+x[1]+')').join('<br>')||'—', 'text'],
+  ['常同場對手',   s=>(s.rivals||[]).slice(0,3).map(x=>esc(x[0])+'('+x[1]+')').join('<br>')||'—', 'text'],
   ['公告年份',     s=>s.years.length?(s.years[0][0]+'–'+s.years[s.years.length-1][0]):'—', 'text'],
   ['快照時間',     s=>new Date(s.at).toLocaleString('zh-TW',{hour12:false}).replace(/:\d\d$/,''), 'text']
 ];
@@ -2675,9 +2761,10 @@ function renderVendorCompare(){
       : '<span class="text-slate-400">抓取範圍內沒有共同的機關</span>')+
     '</td></tr>';
   h+='</tbody></table></div>'+
-    '<p class="text-[11px] text-slate-400 leading-relaxed">所有數字都只涵蓋<strong>已抓取的範圍</strong>（每家 '+RIVAL_PAGES+' 頁、'+(RIVAL_PAGES*20)+' 筆上限），'+
+    '<p class="text-[11px] text-slate-400 leading-relaxed">所有數字都只涵蓋<strong>已抓取的範圍</strong>（每家 '+RIVAL_PAGES+' 頁、'+(RIVAL_PAGES*RIVAL_PER_PAGE)+' 筆上限），'+
     '「官方總筆數」才是全歷史。抓取筆數不同的兩家不能直接比件數，比例類與名單類才有意義。'+
-    '「共同投標夥伴」來自決標公告的得標廠商名單，所以只看得到<strong>一起得標</strong>的組合，一起投標但沒中的看不到。</p>';
+    '<strong>「共同得標夥伴」是同一案一起得標的別家；「常同場對手」是同一案出現、但不是一起得標的別家</strong>——'+
+    '公告的廠商名單把得標與落標列在一起，兩者很容易被混為一談。</p>';
   box.innerHTML=h+'</div></details>';
 }
 
@@ -2745,7 +2832,7 @@ function showDayList(key){
   go('tenders');
   document.getElementById('searchMeta').textContent=key+' 共 '+recs.length+' 則公告（來自本機快取）';
   const list=document.getElementById('searchResults'); list.innerHTML=''; document.getElementById('searchPager').innerHTML='';
-  recs.slice(0,200).forEach(r=>list.appendChild(tenderCard({unit_id:r.u,unit_name:r.n,job_number:r.j,date:key,brief:{title:r.t,type:r.ty,companies:{names:r.c||[]}}})));
+  recs.slice(0,200).forEach(r=>list.appendChild(tenderCard({unit_id:r.u,unit_name:r.n,job_number:r.j,date:key,brief:{title:r.t,type:r.ty,companies:{names:r.c||[]}},winners:r.w?r.w.map(i=>(r.c||[])[i]).filter(Boolean):null})));
 }
 
 /* ================= 追蹤與比較 ================= */
