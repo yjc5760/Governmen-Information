@@ -84,8 +84,45 @@ CMD 讀批次檔時，是用「**舊字碼頁算出的位元組位置**」記住
 3. **版號在 exe 裡讀不到 `package.json`** → 打包時用 `--define:__APP_VERSION__` 固化。
    ⚠️ `--define` 的值是 **JS 運算式**，`JSON.stringify` 只能包**一層**；
    包兩層會變成 `v"1.1.0"`（第一次就是這樣錯的，而且要跑起來才看得出來）。
-4. **`node node_modules/esbuild/bin/esbuild` 會失敗且吞掉錯誤訊息**
-   → 改成直接呼叫 `node_modules/.bin/esbuild`。
+4. **`node node_modules/esbuild/bin/esbuild` 會失敗且吞掉錯誤訊息。**
+   當時改成直接呼叫 `node_modules/.bin/esbuild`——**但那在 Windows 上是死路**，見下面第六個坑。
+   最後的答案是兩個都不要：**走 esbuild 的 JS API**。
+
+## ★ 第六個坑：Node 不准 spawn `.cmd`，而 Windows 的 esbuild 就是 `.cmd`
+
+把 .bat 的編碼問題修好之後，打包在 Windows 上仍然失敗，但錯誤完全不同：
+
+```
+code: 'EINVAL',
+syscall: 'spawnSync D:\自用情報網站\node_modules\.bin\esbuild.cmd',
+path: 'D:\自用情報網站\node_modules\.bin\esbuild.cmd',
+status: null, signal: null, pid: 0
+Node.js v24.18.0
+```
+
+**Node 從 18.20.2／20.12.2／21.7.3 起（CVE-2024-27980 的修補）
+拒絕用 `execFile` / `spawn` 直接執行 `.cmd` 或 `.bat`，會丟 `EINVAL`。**
+而 Windows 上 `node_modules/.bin/esbuild` 就是 `esbuild.cmd`，所以必中。
+（Linux 上那是個 symlink 指到真的 JS 檔，所以在容器裡怎麼測都不會出現。）
+
+`status: null`、`pid: 0` 是特徵：**process 根本沒被建立**，不是跑起來才失敗。
+
+### 三個選項與取捨
+
+| 做法 | 問題 |
+| :--- | :--- |
+| `shell: true` | 可以繞過，但要自己顧引號，而這個專案的路徑含中文（`D:\自用情報網站`） |
+| `node node_modules/esbuild/bin/esbuild` | 就是第 4 條那個會吞錯誤訊息的做法 |
+| **esbuild 的 JS API `buildSync()`** | **完全不經過 shim**，esbuild 內部自己去跑真正的 `esbuild.exe`（不是 `.cmd`） |
+
+選 JS API，順便還解決了第 3 條那個 `--define` 引號層數的坑——
+`define: { __APP_VERSION__: JSON.stringify(APP_VERSION) }` 一目了然。
+
+**規則**：這支腳本的 `run()` 已經加上護欄，傳進 `.cmd`／`.bat` 會直接丟錯並說明原因。
+真的非得跑 shim（目前只有跨平台打包時的 `npm pack`）請用 `runShim()`，
+它只在 Windows 上開 `shell:true` 並把每個參數包上引號。
+`test/parse.test.mjs` 有兩支測試守著：build-exe.mjs 不可以出現 spawn shim 的寫法、
+以及護欄本身的行為（大小寫都要擋、`.exe` 不可以被誤擋）。
 
 ## 驗證方式（Windows exe 無法在 Linux 執行）
 

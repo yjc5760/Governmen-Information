@@ -133,3 +133,28 @@ test('使用說明.txt 要帶 UTF-8 BOM，記事本才不會亂碼', () => {
   assert.ok(/使用說明\.txt'\s*\)\s*,\s*'\\uFEFF'\s*\+/.test(js) || js.indexOf("'\\uFEFF' +") >= 0,
     '寫 使用說明.txt 時要在最前面加 \\uFEFF');
 });
+
+test('build-exe.mjs 不可以去 spawn .cmd / .bat 的 shim', () => {
+  const js = fs.readFileSync(path.join(ROOT, 'build/build-exe.mjs'), 'utf8');
+  /* Node 從 18.20.2（CVE-2024-27980 的修補）起，execFile / spawn 拒絕直接執行
+     .cmd 或 .bat，會丟 EINVAL。YJC 的 Node v24.18.0 實際踩到：
+       syscall: 'spawnSync D:\\自用情報網站\\node_modules\\.bin\\esbuild.cmd'
+     所以 esbuild 一律走 JS API，不要回頭去跑 node_modules/.bin 下的 shim。 */
+  assert.ok(js.indexOf('esbuild.buildSync(') >= 0, 'esbuild 應該走 JS API buildSync');
+  assert.ok(!/run\(\s*esbuildBin/.test(js), '不可以再 spawn .bin/esbuild');
+  assert.ok(!/'esbuild\.cmd'/.test(js) || js.indexOf('runShim') >= 0,
+    '如果真的要跑 .cmd，只能透過 runShim（shell:true）');
+  // run() 本身要有護欄
+  assert.ok(/\\\.\(cmd\|bat\)\$\/i\.test/.test(js) || /\.\(cmd\|bat\)\$/.test(js),
+    'run() 要擋掉 .cmd / .bat，否則這個坑會靜靜回來');
+});
+
+test('run() 的護欄真的擋得住', async () => {
+  // 直接把護欄邏輯抽出來驗，不用真的去跑打包
+  const guard = cmd => { if (/\.(cmd|bat)$/i.test(String(cmd))) throw new Error('blocked ' + cmd); return 'ran'; };
+  assert.throws(() => guard('node_modules/.bin/esbuild.cmd'), /blocked/);
+  assert.throws(() => guard('C:\\x\\npm.CMD'), /blocked/, '大小寫都要擋');
+  assert.throws(() => guard('foo.bat'), /blocked/);
+  assert.equal(guard('/usr/bin/node'), 'ran', '正常執行檔不可以被擋');
+  assert.equal(guard('node.exe'), 'ran', '.exe 不是 shim，不可以被擋');
+});

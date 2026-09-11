@@ -30,8 +30,25 @@ const APP_VERSION = (() => {
   catch { return '0.0.0'; }
 })();
 
-const run = (cmd, args, opts={}) =>
-  execFileSync(cmd, args, { stdio:'inherit', cwd:ROOT, ...opts });
+/* Node 從 18.20.2／20.12.2／21.7.3 起（CVE-2024-27980 的修補）
+   拒絕用 execFile / spawn 直接執行 .cmd 或 .bat，會丟 EINVAL：
+     code: 'EINVAL', syscall: 'spawnSync D:\...\node_modules\.bin\esbuild.cmd'
+   所以這裡直接擋掉，免得哪天又有人把 Windows 的 shim 塞回來。
+   要跑 shim 請用 runShim()，能用 JS API 的就完全不要開 child process。 */
+const run = (cmd, args, opts={}) => {
+  if (/\.(cmd|bat)$/i.test(String(cmd)))
+    throw new Error('不可以直接執行 ' + cmd + '：Node 會丟 EINVAL（CVE-2024-27980 的修補）。'
+      + '請改用該工具的 JS API，或走 runShim()。');
+  return execFileSync(cmd, args, { stdio:'inherit', cwd:ROOT, ...opts });
+};
+/* 非得跑 npm 這種 shim 的時候才用。Windows 上要 shell:true，
+   而 shell:true 就得自己顧引號，所以參數一律包起來。 */
+const runShim = (cmd, args, opts={}) => {
+  const win = process.platform === 'win32';
+  return execFileSync(win ? cmd + '.cmd' : cmd,
+    win ? args.map(a => '"' + String(a).replace(/"/g,'\\"') + '"') : args,
+    { stdio:'inherit', cwd:ROOT, shell: win, ...opts });
+};
 const say = m => console.log('  ' + m);
 
 /* 這些中文訊息原本在 build/打包exe.bat 裡。
@@ -54,17 +71,30 @@ fs.mkdirSync(TMP, { recursive:true });
 /* ---------- 1. 打包成單一 CJS ---------- */
 say('打包 server.js＋相依套件＋HTML …');
 const bundle = path.join(TMP, 'app.cjs');
-const esbuildBin = path.join(ROOT,'node_modules','.bin', process.platform==='win32' ? 'esbuild.cmd' : 'esbuild');
-run(esbuildBin, [
-  path.join(ROOT,'build','exe-entry.mjs'),
-  '--bundle', '--platform=node', '--format=cjs', '--target=node20',
-  '--loader:.html=text',
-  // esbuild 的 --define 值是「JS 運算式」，所以字串要帶引號；只能包一層，
+/* 用 esbuild 的 JS API，不要去 spawn node_modules/.bin/esbuild。
+   Windows 上那個 shim 是 esbuild.cmd，而 Node 從 18.20.2 起拒絕直接執行
+   .cmd／.bat（CVE-2024-27980 的修補），會丟 EINVAL 而不是跑起來——
+   YJC 的 Node v24.18.0 實際踩到，訊息是
+     syscall: 'spawnSync D:\自用情報網站\node_modules\.bin\esbuild.cmd'
+   加 shell:true 可以繞過，但這個專案的路徑含中文，引號處理風險更高。
+   JS API 完全不經過 shim，esbuild 內部是去跑真正的 esbuild.exe（不是 .cmd），
+   順便也不用再煩惱 --define 的引號要包幾層。 */
+let esbuild;
+try { esbuild = await import('esbuild'); }
+catch (e) {
+  throw new Error('載入不到 esbuild。請先在專案根目錄執行：'
+    + 'npm install --no-save esbuild postject\n（原始錯誤：' + e.message + '）');
+}
+esbuild.buildSync({
+  entryPoints: [path.join(ROOT,'build','exe-entry.mjs')],
+  outfile: bundle,
+  bundle: true, platform: 'node', format: 'cjs', target: 'node20',
+  loader: { '.html': 'text' },
+  // define 的值是「JS 運算式」，所以字串要帶引號——JSON.stringify 剛好一層，
   // 包兩層會變成值本身含引號（v"1.1.0"）
-  '--define:__APP_VERSION__=' + JSON.stringify(APP_VERSION),
-  '--outfile=' + bundle,
-  '--log-level=warning'
-]);
+  define: { __APP_VERSION__: JSON.stringify(APP_VERSION) },
+  logLevel: 'warning'
+});
 say('bundle：' + (fs.statSync(bundle).size/1048576).toFixed(1) + ' MB');
 
 /* ---------- 2. 產生 SEA blob ---------- */
@@ -90,7 +120,7 @@ function winNodeExe(){
   const pkgDir = path.join(TMP, 'winnode');
   fs.mkdirSync(pkgDir, { recursive:true });
   say('從 npm 取得 node-win-x64@' + NODE_VER + ' …');
-  run('npm', ['pack', 'node-win-x64@' + NODE_VER, '--pack-destination', pkgDir],
+  runShim('npm', ['pack', 'node-win-x64@' + NODE_VER, '--pack-destination', pkgDir],
       { stdio:['ignore','pipe','inherit'] });
   const tgz = fs.readdirSync(pkgDir).find(f=>f.endsWith('.tgz'));
   if (!tgz) throw new Error('抓不到 node-win-x64@' + NODE_VER +
