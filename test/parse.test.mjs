@@ -4,7 +4,12 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseRows, parseRocDate, parseBudget, resolveStatic, applyFilters } from '../server.js';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 test('parseRocDate 民國年轉西元', () => {
   assert.equal(parseRocDate('115/09/20').getFullYear(), 2026);
@@ -73,4 +78,58 @@ test('applyFilters 遇到壞參數不會清空結果', () => {
   assert.equal(applyFilters(recs, q('exclude=中油')).length, 1);
   assert.equal(applyFilters(recs, q('sort=budget'))[0].name, 'B案');
   assert.equal(applyFilters(recs, q('sort=deadline'))[0].name, 'A案');
+});
+
+/* Windows 批次檔的守門測試。
+   實際發生過：打包exe.bat 是 UTF-8＋中文＋LF，而且裡面有 chcp 65001，
+   在 zh-TW 的 CMD 下整個畫面都是「不是內部或外部命令」，
+   命令名稱被切掉開頭（echo → ho、start → s）。
+   原因是 CMD 用「舊字碼頁算出的位元組位置」繼續讀批次檔，
+   chcp 切換後就接在字元中間，之後每一行都位移。
+   純 ASCII 時位元組數與字元數相同，不管字碼頁怎麼換都不會位移，
+   所以這兩件事一定要守住：整份純 ASCII、行尾 CRLF。 */
+const BATS = ['start-windows.bat', 'build/打包exe.bat'];
+
+for (const rel of BATS) {
+  test('批次檔 ' + rel + ' 必須是純 ASCII', () => {
+    const buf = fs.readFileSync(path.join(ROOT, rel));
+    const bad = [];
+    for (let i = 0; i < buf.length; i++) if (buf[i] > 0x7f) bad.push(i);
+    assert.equal(bad.length, 0,
+      '第 ' + bad.slice(0, 5).join('、') + ' 個位元組是非 ASCII。'
+      + '批次檔裡不可以有中文——要顯示中文請改在 node 腳本裡 console.log，'
+      + '.bat 只負責 chcp 65001。');
+  });
+
+  test('批次檔 ' + rel + ' 行尾必須是 CRLF', () => {
+    const buf = fs.readFileSync(path.join(ROOT, rel));
+    const s = buf.toString('latin1');
+    const lone = (s.match(/(?<!\r)\n/g) || []).length;
+    assert.equal(lone, 0, '有 ' + lone + ' 個單獨的 LF。CMD 對 LF-only 的批次檔行為不穩定。');
+    assert.ok(s.indexOf('\r\n') >= 0, '完全沒有 CRLF，檔案是空的還是被改壞了？');
+  });
+}
+
+test('有 chcp 65001 的批次檔，同一份檔案不可以有非 ASCII 內容', () => {
+  // 這兩件事單獨都沒問題，湊在一起才會爆——所以測的是「組合」
+  for (const rel of BATS) {
+    const buf = fs.readFileSync(path.join(ROOT, rel));
+    const hasChcp = buf.toString('latin1').indexOf('chcp 65001') >= 0;
+    if (!hasChcp) continue;
+    const nonAscii = [...buf].some(b => b > 0x7f);
+    assert.equal(nonAscii, false, rel + ' 同時有 chcp 65001 與非 ASCII 內容，這是壞掉的那個組合');
+  }
+});
+
+test('中文提示改由 node 腳本輸出，沒有跟著 .bat 一起消失', () => {
+  const js = fs.readFileSync(path.join(ROOT, 'build/build-exe.mjs'), 'utf8');
+  for (const kw of ['打包成單一 exe', '需要：Node.js', '給同仁的', '不必重新打包']) {
+    assert.ok(js.indexOf(kw) >= 0, 'build-exe.mjs 應該要輸出「' + kw + '」，否則使用者什麼提示都看不到');
+  }
+});
+
+test('使用說明.txt 要帶 UTF-8 BOM，記事本才不會亂碼', () => {
+  const js = fs.readFileSync(path.join(ROOT, 'build/build-exe.mjs'), 'utf8');
+  assert.ok(/使用說明\.txt'\s*\)\s*,\s*'\\uFEFF'\s*\+/.test(js) || js.indexOf("'\\uFEFF' +") >= 0,
+    '寫 使用說明.txt 時要在最前面加 \\uFEFF');
 });

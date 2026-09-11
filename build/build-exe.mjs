@@ -34,6 +34,20 @@ const run = (cmd, args, opts={}) =>
   execFileSync(cmd, args, { stdio:'inherit', cwd:ROOT, ...opts });
 const say = m => console.log('  ' + m);
 
+/* 這些中文訊息原本在 build/打包exe.bat 裡。
+   .bat 一旦同時有「非 ASCII 內容」與「chcp 65001」，CMD 會用舊字碼頁算出的
+   位元組位置繼續讀檔，切換後接在字元中間，之後每一行都位移，
+   命令名稱被切掉開頭（echo → ho、start → s），整個畫面都是
+   「不是內部或外部命令」。所以 .bat 保持純 ASCII，中文一律由這支腳本輸出——
+   chcp 65001 只負責讓 Node 的 UTF-8 輸出顯示正確，那是安全的。 */
+console.log('');
+console.log('  ====================================================');
+console.log('   ' + APP_NAME + ' — 打包成單一 exe');
+console.log('  ====================================================');
+console.log('');
+say('需要：Node.js 20 以上（目前 v' + NODE_VER + '）、電腦可以連上網路');
+console.log('');
+
 fs.rmSync(OUT, { recursive:true, force:true });
 fs.mkdirSync(TMP, { recursive:true });
 
@@ -113,7 +127,9 @@ if (process.argv.includes('--linux') && process.platform === 'linux') {
 }
 
 /* ---------- 5. 附上使用說明 ---------- */
-fs.writeFileSync(path.join(OUT,'使用說明.txt'),
+/* 加 UTF-8 BOM：Windows 10 1903 之前的記事本看不出 UTF-8，
+   沒有 BOM 會整篇亂碼，而這份是要給同仁看的。 */
+fs.writeFileSync(path.join(OUT,'使用說明.txt'), '\uFEFF' +
 `標案參謀室 — 使用說明
 ${'='.repeat(46)}
 
@@ -157,3 +173,11 @@ fs.readdirSync(OUT).forEach(f=>{
   const st=fs.statSync(path.join(OUT,f));
   say('  ' + f + '  ' + (st.size/1048576).toFixed(1) + ' MB');
 });
+console.log('');
+say(APP_NAME + '.exe   ← 給同仁的，單一檔案就能跑');
+say('使用說明.txt     ← 一起給他們');
+console.log('');
+say('提醒：以後只改了網頁（' + APP_NAME + '.html）的話，不必重新打包——');
+say('      直接把新的 html 放到 exe 旁邊同一個資料夾就會優先生效，');
+say('      黑色視窗會顯示它讀到哪一份。');
+console.log('');
