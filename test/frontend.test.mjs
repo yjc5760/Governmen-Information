@@ -688,3 +688,106 @@ test('cmpLabel / cmpSection 拆解公告欄位的分區前綴', () => {
   assert.equal(app.cmpSection('領投標資料:是否須繳納押標金:押標金額度'), '領投標資料');
   assert.equal(app.cmpSection('fetched_at'), '其他');
 });
+
+/* 這些標題都是 2026-09 從台電核能火力發電工程處（3.13.32.15）實際抓下來的原文。
+   該機關 610 則決標裡有 170 則是契約變更（27.9%），不排除的話件數與落標率都會壞掉。 */
+test('契約變更要排除，但不能誤殺真案子', () => {
+  const 是變更 = [
+    '台中電廠第二期新建燃氣機組計畫-電廠工程委託技術服務第3次契約變更',
+    '台中1&2號機複循環機組採購案第八次契約變更「增設流量電腦報表計算參數及變更相關數值單位」',
+    '龍門(核四)計畫一、二號機耐震級導引燈「增購支架材料一批」契約變更(第4次)',
+    '大林電廠一、二號機組臨時供煤設施連續式卸煤機之契約變更案Amendment No.2',
+    '龍門計畫一、二號機反應器圍阻體襯板組件契約「時程展延之契約變更」',
+    // 全形康熙部首「⼗」(U+2F17)，不是「十」(U+5341)——用「第N次」比對會漏掉
+    '⼤潭8&9號機主發電設備採購案第⼗一次契約變更-SYD CDCS RTU訊號整合'
+  ];
+  const 不是變更 = [
+    '台中電廠第二期新建燃氣機組計畫-電廠工程委託技術服務',
+    '通霄電廠二期更新改建計畫海底輸氣管線統包工程採購案',
+    '某某道路工程變更設計委託技術服務',          // 「變更設計」是真案子
+    '龍門計畫合約8749411E007C0增購試運轉期間必要之備品', // 「增購」也可能是真採購
+    '「台中發電廠第2階段煤灰填海工程計畫」環境影響差異分析報告委託服務'
+  ];
+  是變更.forEach(t => assert.equal(app.isAmendment(t), true, '應判為契約變更：' + t));
+  不是變更.forEach(t => assert.equal(app.isAmendment(t), false, '不可誤判為契約變更：' + t));
+});
+
+test('isAwardRec 排除更正、撤銷與契約變更', () => {
+  const mk = (type, title) => ({ brief: { type, title } });
+  assert.equal(app.isAwardRec(mk('決標公告', '某某統包工程')), true);
+  assert.equal(app.isAwardRec(mk('決標公告', '某某工程第3次契約變更')), false, '契約變更不算一件決標');
+  assert.equal(app.isAwardRec(mk('更正決標公告', '某某統包工程')), false);
+  assert.equal(app.isAwardRec(mk('無法決標公告', '某某統包工程')), false);
+  assert.equal(app.isAwardRec(mk('定期彙送', '某某統包工程')), false);
+});
+
+test('vendorStats 與 bidRatios 都不可把契約變更算進去', () => {
+  const mk = (type, title, job, names) => ({ job_number: job, date: '20260301',
+    brief: { type, title, companies: { names,
+      name_key: Object.fromEntries(names.map(n => [n, ['決標品項:第1品項:得標廠商1:得標廠商']])) } } });
+  const recs = [
+    mk('決標公告', '原案：某某統包工程', 'J1', ['甲公司']),
+    mk('決標公告', '某某統包工程第1次契約變更', 'J2', ['甲公司']),
+    mk('決標公告', '某某統包工程第2次契約變更', 'J3', ['甲公司'])
+  ];
+  const vs = app.vendorStats(recs);
+  assert.equal(vs.length, 1);
+  assert.equal(vs[0].count, 1, '三則裡只有一則是真的決標，不是 3');
+});
+
+test('pickText 只吃鍵尾完全相符的欄位，不會撈到伴生欄位', () => {
+  const d = {
+    '無法決標公告:無法決標的理由:remind': '這是說明文字不是理由',
+    '無法決標公告:無法決標的理由': '流標(無廠商投標或未達法定開標家數)',
+    '無法決標公告:是否沿用本案號及原招標方式續行招標': '是'
+  };
+  assert.equal(app.pickText(d, ['無法決標的理由']), '流標(無廠商投標或未達法定開標家數)');
+  assert.equal(app.pickText(d, ['是否沿用本案號及原招標方式續行招標']), '是');
+  assert.equal(app.pickText(d, ['不存在的欄位']), '');
+});
+
+test('dayGap 算得出天數，壞日期回 null', () => {
+  assert.equal(app.dayGap('20250814', '20260204'), 174);   // 實際的流標→重招間隔
+  assert.equal(app.dayGap('20260301', '20260301'), 0);
+  assert.equal(app.dayGap('', '20260301'), null);
+  assert.equal(app.dayGap('2026', '20260301'), null);
+});
+
+test('flopSeries 串出流標序列，並分出成案與未成案', () => {
+  const mk = (type, title, job, date) => ({ job_number: job, date, brief: { type, title } });
+  const recs = [
+    // A 案：招標 → 流標 → 招標 → 流標 → 決標（已成案）
+    mk('公開招標公告', 'A 案', 'A', '20250101'),
+    mk('無法決標公告', 'A 案', 'A', '20250201'),
+    mk('公開招標公告', 'A 案', 'A', '20250301'),
+    mk('無法決標公告', 'A 案', 'A', '20250401'),
+    mk('決標公告',     'A 案', 'A', '20250501'),
+    // B 案：流標三次，至今沒有決標
+    mk('無法決標公告', 'B 案', 'B', '20250110'),
+    mk('無法決標公告', 'B 案', 'B', '20250310'),
+    mk('無法決標公告', 'B 案', 'B', '20250610'),
+    // C 案：曾決標，但之後又流標 → 算未成案（那次決標是上一輪的事）
+    mk('決標公告',     'C 案', 'C', '20250201'),
+    mk('無法決標公告', 'C 案', 'C', '20250901'),
+    // D 案：只有契約變更當決標 → 不可算成案
+    mk('無法決標公告', 'D 案', 'D', '20250401'),
+    mk('決標公告',     'D 案第1次契約變更', 'D', '20250501'),
+    // E 案：從未流標，不該進清單
+    mk('公開招標公告', 'E 案', 'E', '20250101'),
+    mk('決標公告',     'E 案', 'E', '20250201')
+  ];
+  const rows = app.flopSeries(recs);
+  assert.equal(rows.length, 4, '只有流過標的案號才進清單（E 案不該在）');
+  assert.equal(rows[0].job, 'B', '流標次數最多的排最前');
+  assert.equal(rows[0].fails, 3);
+  assert.equal(JSON.stringify(rows[0].gaps), JSON.stringify([59, 92]), '間隔天數');
+  assert.equal(rows[0].settled, false);
+
+  const by = {}; rows.forEach(r => { by[r.job] = r; });
+  assert.equal(by.A.settled, true, 'A 案最後一次流標之後有決標');
+  assert.equal(by.A.settledDate, '20250501');
+  assert.equal(by.A.span, 89, '第一次流標到成案的天數');
+  assert.equal(by.C.settled, false, '決標在流標之前，不算成案');
+  assert.equal(by.D.settled, false, '契約變更不能當成案');
+  assert.equal(by.D.title, 'D 案', '標題取自流標公告，不是契約變更那則');
+});

@@ -102,6 +102,76 @@ assert.ok(!cards[0].includes('泰興'), '落標的泰興不該被列成得標者
 assert.ok(cards[1].includes('廠商丙公司') && !cards[1].includes('得標丙公司'),
   '分不出勝負時只能標中性的「廠商」：' + cards[1]);
 
+
+// ── 4. 機關洞察：流標機會清單 ＋ 契約變更排除 ─────────────────────────
+{
+  const N = ns => ({ '決標品項:第1品項:得標廠商1:得標廠商': 1 } && ns);
+  const co = names => ({ names, name_key: Object.fromEntries(
+    names.map(n => [n, ['投標廠商:投標廠商1:廠商名稱', '決標品項:第1品項:得標廠商1:得標廠商']])) });
+  const mk = (type, title, job, date, names) =>
+    ({ unit_id: 'U', unit_name: '測試機關', job_number: job, date, filename: job + date,
+       brief: { type, title, companies: names ? co(names) : { names: [], name_key: {} } } });
+
+  const records = [
+    // A：招標→流標→招標→流標→決標（已成案）
+    mk('公開招標公告', 'A 統包工程', 'A', '20250101'),
+    mk('無法決標公告', 'A 統包工程', 'A', '20250201'),
+    mk('公開招標公告', 'A 統包工程', 'A', '20250301'),
+    mk('無法決標公告', 'A 統包工程', 'A', '20250401'),
+    mk('決標公告',     'A 統包工程', 'A', '20250501', ['甲工程顧問']),
+    // B：流標三次，至今未決標 —— 這才是機會
+    mk('無法決標公告', 'B 委託技術服務', 'B', '20250110'),
+    mk('無法決標公告', 'B 委託技術服務', 'B', '20250310'),
+    mk('無法決標公告', 'B 委託技術服務', 'B', '20250610'),
+    // D：只有契約變更當決標，不可算成案
+    mk('無法決標公告', 'D 設備採購', 'D', '20250401'),
+    mk('決標公告', 'D 設備採購第1次契約變更', 'D', '20250501', ['甲工程顧問']),
+    // E：沒流過標，不該進清單；另外兩則契約變更不可灌水廠商件數
+    mk('公開招標公告', 'E 監造服務', 'E', '20250101'),
+    mk('決標公告', 'E 監造服務', 'E', '20250201', ['甲工程顧問']),
+    mk('決標公告', 'E 監造服務第2次契約變更', 'E2', '20250601', ['甲工程顧問']),
+    mk('決標公告', 'E 監造服務第3次契約變更', 'E3', '20250701', ['甲工程顧問'])
+  ];
+
+  await page.evaluate(recs => {
+    unitData = { unit_id: 'U', unit_name: '測試機關', records: recs,
+                 total: recs.length, totalPages: 1, pagesFetched: 1, stop: { reason: 'done' } };
+    unitPeriod = 0;
+    go('agencies');
+    renderAgencyDetail();
+  }, records);
+  await page.waitForTimeout(300);
+
+  const detail = await page.textContent('#agencyDetail');
+  assert.ok(detail.includes('流標機會清單'), '機關洞察要出現流標機會清單');
+  assert.ok(detail.includes('曾流標 3 案'), '應為 3 案（E 沒流過標）：' + detail.slice(0, 0) + detail.match(/曾流標 \d+ 案/));
+  assert.ok(detail.includes('至今未決標 2 案'), 'B 與 D 都算未成案：' + detail.match(/至今未決標 \d+ 案/));
+  assert.ok(detail.includes('流標 3 次'), 'B 案要標出流標 3 次');
+  assert.ok(detail.includes('間隔 59、92 天'), '要算出流標間隔');
+  assert.ok(!/D 設備採購第1次契約變更/.test(detail), '流標清單的標題不可取契約變更那則');
+
+  // 契約變更不可灌水得標件數：甲工程顧問實際只得標 2 件（A、E）
+  const rank = await page.textContent('#vendorRank');
+  const m = rank.match(/甲工程顧問[^0-9]*(\d+)/);
+  assert.ok(m, '得標廠商排行要列出甲工程顧問：' + rank.slice(0, 200));
+  assert.equal(m[1], '2', '四則決標裡兩則是契約變更，件數應為 2 不是 4');
+
+  // 真的點開「已重招決標」摺疊區
+  const sums = await page.$$('#agencyDetail details summary');
+  const target = [];
+  for (const s of sums) { if ((await s.textContent()).includes('已重招決標')) target.push(s); }
+  assert.equal(target.length, 1, '應該有一個「已重招決標」摺疊區');
+  await target[0].click();
+  await page.waitForTimeout(150);
+  const opened = await page.$eval('#agencyDetail details', d => d.open);
+  assert.equal(opened, true, '點擊摘要要能展開');
+  assert.ok((await page.textContent('#agencyDetail')).includes('歷時 89 天'), 'A 案第一次流標到成案 89 天（20250201→20250501）');
+
+  // 補詳情按鈕要真的在（而且 onclick 沒被截斷）
+  const btn = await page.$('#agencyDetail button[onclick*="fillFlopDetail"]');
+  assert.ok(btn, '要有「補流標原因與預算變化」按鈕');
+}
+
 // CDN 載不到是離線環境的事，不算程式錯
 const real = errs.filter(e => !/tailwind|Failed to load resource/i.test(e));
 assert.equal(real.length, 0, '頁面有錯誤：\n' + real.join('\n'));
