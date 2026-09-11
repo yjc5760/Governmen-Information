@@ -50,6 +50,7 @@ proxy 預設只綁 `127.0.0.1`，同一台機器以外連不進來。想從手�
 │   ├── parse.test.mjs      server.js 的煙霧測試（不連外網）
 │   ├── frontend.test.mjs   前端純邏輯測試（用 node:vm 跑 HTML 裡的 script，零額外依賴）
 │   └── ui-smoke.mjs        畫面實測（真的用滑鼠點，需自行裝 playwright，npm test 不會跑）
+├── docs/                   專案文件（改程式前先看易錯陷阱清單）
 ├── build/
 │   ├── build-exe.mjs       打包成單一執行檔（Node SEA）
 │   ├── exe-entry.mjs       打包後的入口（自動開瀏覽器、連接埠備援）
