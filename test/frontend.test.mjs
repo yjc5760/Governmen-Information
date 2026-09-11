@@ -873,3 +873,123 @@ test('preLeadStats 樣本不足不給推估，反常值不入統計', () => {
   assert.equal(st.med, 28);
   assert.equal(app.preLeadStats([{ gap: null }]), null, '完全沒有可用樣本要回 null');
 });
+
+test('rivalEta 預估秒數會隨頁數增加，且不會回 0', () => {
+  // vendorPages 是 let 宣告，vm 沙箱拿不到，所以只驗純函式部分
+  assert.ok(app.rivalEta(1) >= 1, '再少也要回 1 秒，不可顯示「約 0 秒」');
+  assert.ok(app.rivalEta(6) < app.rivalEta(16), '6 頁要比 16 頁快');
+  assert.ok(app.rivalEta(16) < app.rivalEta(55), '16 頁要比 55 頁快');
+  assert.ok(app.rivalEta(16) <= 30, '16 頁（亞新）實測 15 秒，預估不該離譜：' + app.rivalEta(16));
+});
+
+test('vsnapCoverage 把「為什麼只有這麼多」講成一句話', () => {
+  const mk = (fetched, total, stop) => ({ fetched, total, stop });
+  const done = app.vsnapCoverage(mk(553, 553, { reason: 'done' }));
+  assert.equal(done.complete, true);
+  assert.equal(done.ratio, 1);
+  assert.ok(done.msg.indexOf('已抓完') >= 0);
+
+  const cap = app.vsnapCoverage(mk(300, 1507, { reason: 'cap', page: 3 }));
+  assert.equal(cap.complete, false);
+  assert.ok(Math.abs(cap.ratio - 300 / 1507) < 1e-9);
+  assert.ok(cap.msg.indexOf('頁數上限') >= 0, '要說是頁數上限：' + cap.msg);
+
+  const empty = app.vsnapCoverage(mk(800, 5482, { reason: 'empty', page: 9 }));
+  assert.equal(empty.complete, false);
+  assert.ok(empty.msg.indexOf('第 9 頁') >= 0 && empty.msg.indexOf('空') >= 0,
+    '空頁要指出是第幾頁：' + empty.msg);
+
+  const fail = app.vsnapCoverage(mk(400, 5482, { reason: 'fail', page: 5, msg: 'Failed to fetch' }));
+  assert.ok(fail.msg.indexOf('第 5 頁') >= 0 && fail.msg.indexOf('失敗') >= 0, fail.msg);
+
+  // 舊快照沒有 stop 欄位時要當成已抓完，而不是爆掉
+  const old = app.vsnapCoverage({ fetched: 60, total: 553 });
+  assert.equal(old.complete, true);
+  assert.equal(app.vsnapCoverage(null), null);
+});
+
+test('vsnapFairness：涵蓋率落差大就判定件數不可比', () => {
+  const mk = (fetched, total) => ({ fetched, total, stop: { reason: 'cap' } });
+  // 螢幕上那三家：300/553=54%、300/1507=20%、300/823=36% → 落差 2.7 倍
+  const unfair = app.vsnapFairness([mk(300, 553), mk(300, 1507), mk(300, 823)]);
+  assert.equal(unfair.fair, false, '54% 對 20% 不可比');
+  assert.ok(Math.abs(unfair.lo - 300 / 1507) < 1e-9);
+  assert.ok(Math.abs(unfair.hi - 300 / 553) < 1e-9);
+
+  // 都抓到底 → 三家都是 100%，可比
+  const fair = app.vsnapFairness([mk(553, 553), mk(1507, 1507), mk(823, 823)]);
+  assert.equal(fair.fair, true, '都抓完就可以比件數');
+
+  // 只有一家沒得比，視為公平（不要無意義地標「不可比」）
+  assert.equal(app.vsnapFairness([mk(300, 553)]).fair, true);
+  // 官方總筆數缺失時不要當成 0 去除
+  assert.equal(app.vsnapFairness([mk(300, 0), mk(300, 0)]).fair, true);
+});
+
+/* fetchVendor 是 async 且會打 api()，所以把 api 換成假的來測。
+   api 是函式宣告，會成為 vm context 的屬性，所以覆寫得掉。
+   這一段專門守住「空頁不等於抓完」——那是原本的 bug，
+   而且純資料測試抓不到，一定要跑一次 fetchVendor 本體。 */
+test('fetchVendor：空頁要重試，不可當成抓完', async () => {
+  const realApi = app.api;
+  const page = n => ({ total_records: 553, total_pages: 6,
+    records: Array.from({ length: n }, (_, i) => ({
+      unit_id: 'U', unit_name: '某機關', date: '20260301', job_number: 'J' + i,
+      brief: { type: '決標公告', title: '案 ' + i,
+               companies: { names: ['甲公司'], name_key: { '甲公司': ['決標品項:第1品項:得標廠商1:得標廠商'] } } } })) });
+
+  const calls = [];
+  let emptyOnce = true;
+  app.api = async path => {
+    const p = +(path.match(/page=(\d+)/) || [])[1];
+    calls.push(p);
+    // 第 3 頁第一次故意回空的 records（實測中興第 9 頁、亞新第 16 頁就是這樣）
+    if (p === 3 && emptyOnce) { emptyOnce = false; return page(0); }
+    return page(p === 6 ? 53 : 100);
+  };
+  try {
+    const res = await app.fetchVendor('測試廠商', 6, () => {});
+    assert.equal(res.recs.length, 553, '空頁重試後要拿到完整 553 筆，不是 200 筆');
+    assert.equal(res.pages, 6);
+    assert.equal(res.stop.reason, 'done');
+    assert.equal(calls.filter(p => p === 3).length, 2, '第 3 頁要被重抓一次');
+  } finally { app.api = realApi; }
+});
+
+test('fetchVendor：頁數上限要記成 cap，不可說成抓完', async () => {
+  const realApi = app.api;
+  app.api = async path => {
+    const p = +(path.match(/page=(\d+)/) || [])[1];
+    return { total_records: 1507, total_pages: 16,
+      records: Array.from({ length: 100 }, (_, i) => ({
+        unit_id: 'U', unit_name: '某機關', date: '20260301', job_number: 'J' + p + '_' + i,
+        brief: { type: '決標公告', title: 't', companies: { names: [], name_key: {} } } })) };
+  };
+  try {
+    const res = await app.fetchVendor('測試廠商', 3, () => {});
+    assert.equal(res.recs.length, 300);
+    assert.equal(res.pages, 3);
+    assert.equal(res.stop.reason, 'cap', '只抓 3 / 16 頁必須記成 cap');
+    const cv = app.vsnapCoverage({ fetched: res.recs.length, total: res.total, stop: res.stop });
+    assert.equal(cv.complete, false);
+    assert.ok(cv.msg.indexOf('頁數上限') >= 0);
+  } finally { app.api = realApi; }
+});
+
+test('fetchVendor：真的到最後一頁才算抓完', async () => {
+  const realApi = app.api;
+  app.api = async path => {
+    const p = +(path.match(/page=(\d+)/) || [])[1];
+    const n = p === 3 ? 84 : 100;          // 284 筆 / 3 頁（吉興實測的形狀）
+    return { total_records: 284, total_pages: 3,
+      records: Array.from({ length: n }, (_, i) => ({
+        unit_id: 'U', unit_name: '某機關', date: '20260301', job_number: 'J' + p + '_' + i,
+        brief: { type: '決標公告', title: 't', companies: { names: [], name_key: {} } } })) };
+  };
+  try {
+    const res = await app.fetchVendor('測試廠商', 0, () => {});   // 0 = 抓到底
+    assert.equal(res.recs.length, 284);
+    assert.equal(res.stop.reason, 'done');
+    assert.equal(app.vsnapCoverage({ fetched: 284, total: 284, stop: res.stop }).ratio, 1);
+  } finally { app.api = realApi; }
+});

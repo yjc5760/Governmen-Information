@@ -86,8 +86,8 @@ for (const label of ['得標件數', '落標件數', '抓取範圍內得標率',
 }
 assert.ok(!tt.includes('決標件數'), '舊欄位名「決標件數」不該還在');
 assert.ok(tt.includes('吉興工程顧問股份有限公司(19)'), '吉興要落在「常同場對手」欄');
-assert.ok((await page.textContent('#vendorCompare')).includes('300 筆上限'),
-  '註腳的上限要用每頁 100 筆算');
+assert.ok((await page.textContent('#vendorCompare')).includes('各家已抓取的範圍'),
+  '註腳要說明件數只涵蓋各家抓到的範圍');
 const rows = await page.$$eval('#vendorCompare table tr', rs => rs.map(r => r.textContent));
 const partnerRow = rows.find(t => t.startsWith('前三大夥伴'));
 assert.ok(partnerRow && !partnerRow.includes('吉興'), '吉興不可出現在夥伴列：' + partnerRow);
@@ -255,6 +255,83 @@ assert.ok(cards[1].includes('廠商丙公司') && !cards[1].includes('得標丙�
 
   const btn = await page.$('#agencyDetail button[onclick*="fillPreDetail"]');
   assert.ok(btn, '要有「補預算與資格條款」按鈕');
+}
+
+
+// ── 6. 抓取深度設定 ＋ 涵蓋率公平性 ───────────────────────────────────
+{
+  const snap = (name, total, fetched, stop, awards, lost) => ({
+    name, at: Date.now(), total, tp: Math.ceil(total / 100), pages: Math.ceil(fetched / 100),
+    stop, fetched, awards, lostCases: lost, corrections: 5,
+    agencies: [['台灣電力股份有限公司第三核能發電廠', 45], ['台灣電力股份有限公司', 30]],
+    partners: [['乙顧問', 3]], rivals: [['吉興工程顧問股份有限公司', 19]],
+    years: [['2024', 10], ['2025', 30]], recent: [{ d: '20260301', n: '台電', ti: '某案' }] });
+
+  await page.evaluate(() => { localStorage.setItem('pi_vendor_pages', JSON.stringify(3)); });
+
+  // 情境 A：涵蓋率差很多（螢幕上那三家的實際數字）
+  await page.evaluate(([a, b, c]) => {
+    localStorage.setItem('pi_rivals', JSON.stringify(['泰興工程顧問', '亞新工程顧問', '巨廷工程顧問']));
+    localStorage.setItem('pi_vendor_snap2', JSON.stringify({
+      '泰興工程顧問': a, '亞新工程顧問': b, '巨廷工程顧問': c }));
+    localStorage.setItem('pi_vendor_snap_sel', JSON.stringify(['泰興工程顧問', '亞新工程顧問', '巨廷工程顧問']));
+  }, [snap('泰興工程顧問', 553, 300, { reason: 'cap', page: 3 }, 136, 31),
+      snap('亞新工程顧問', 1507, 300, { reason: 'cap', page: 3 }, 133, 53),
+      snap('巨廷工程顧問', 823, 300, { reason: 'cap', page: 3 }, 152, 108)]);
+  await page.reload();
+  await page.click('.navitem[data-page="market"]');
+  await page.waitForTimeout(350);
+
+  // 抓取深度選項要在，而且目前選的是 3 頁
+  const body = await page.textContent('body');
+  assert.ok(body.includes('抓取深度'), '對手追蹤要有抓取深度設定');
+  assert.ok(body.includes('抓到底'), '要提供「抓到底」選項');
+  const depthBtns = await page.$$eval('#rivalPanel button[onclick*="setVendorPages"]',
+    bs => bs.map(b => ({ t: b.textContent, on: b.className.indexOf('bg-ink-800') >= 0 })));
+  assert.equal(depthBtns.length, 4, '應有 4 個深度選項，實際 ' + depthBtns.length);
+  assert.equal(depthBtns.filter(b => b.on).length, 1, '只能有一個選中');
+  assert.equal(depthBtns.find(b => b.on).t, '3 頁', '目前應選中 3 頁');
+
+  // 對手卡片標頭要寫出涵蓋率與「為什麼停」
+  assert.ok(/已抓 300 筆（\d+%）/.test(body), '標頭要顯示涵蓋率百分比');
+  assert.ok(body.includes('到達設定的頁數上限'), '要說明為什麼只抓到這些');
+
+  // 對比表：不公平 → 橫幅 + 不可比 + 件數不標最佳
+  await page.click('#vendorCompare summary');
+  await page.waitForTimeout(250);
+  const cmp = await page.textContent('#vendorCompare');
+  assert.ok(cmp.includes('這幾家的涵蓋率差距大（'), '涵蓋率落差大要出現警告橫幅（註腳裡也有類似字句，所以比對橫幅獨有的那句）');
+  assert.ok(cmp.includes('抓取深度調成「抓到底」'), '警告要告訴使用者怎麼修');
+  const rows = await page.$$eval('#vendorCompare table tr',
+    rs => rs.map(r => ({ t: r.textContent, jade: r.innerHTML.indexOf('text-jade-700 font-bold') >= 0 })));
+  const won = rows.find(r => r.t.startsWith('得標件數'));
+  assert.ok(won, '找不到得標件數列');
+  assert.ok(won.t.indexOf('不可比') >= 0, '得標件數要標「不可比」：' + won.t);
+  assert.equal(won.jade, false, '涵蓋率不公平時得標件數不可標最佳（螢幕上 152 被標成綠色就是這個問題）');
+  const rate = rows.find(r => r.t.startsWith('抓取範圍內得標率'));
+  assert.ok(rate && rate.jade, '比例類不受影響，仍要標最佳');
+  assert.ok(rows.some(r => r.t.startsWith('涵蓋率')), '要有涵蓋率這一列');
+
+  // 情境 B：三家都抓到底 → 可以比
+  await page.evaluate(([a, b, c]) => {
+    localStorage.setItem('pi_vendor_snap2', JSON.stringify({
+      '泰興工程顧問': a, '亞新工程顧問': b, '巨廷工程顧問': c }));
+  }, [snap('泰興工程顧問', 553, 553, { reason: 'done' }, 250, 60),
+      snap('亞新工程顧問', 1507, 1507, { reason: 'done' }, 700, 200),
+      snap('巨廷工程顧問', 823, 823, { reason: 'done' }, 400, 250)]);
+  await page.reload();
+  await page.click('.navitem[data-page="market"]');
+  await page.waitForTimeout(350);
+  await page.click('#vendorCompare summary');
+  await page.waitForTimeout(250);
+  const cmp2 = await page.textContent('#vendorCompare');
+  assert.ok(!cmp2.includes('這幾家的涵蓋率差距大（'), '都抓完就不該再出現橫幅');
+  const rows2 = await page.$$eval('#vendorCompare table tr',
+    rs => rs.map(r => ({ t: r.textContent, jade: r.innerHTML.indexOf('text-jade-700 font-bold') >= 0 })));
+  const won2 = rows2.find(r => r.t.startsWith('得標件數'));
+  assert.ok(won2.t.indexOf('不可比') < 0, '都抓完不該標不可比');
+  assert.equal(won2.jade, true, '都抓完時件數要標最佳（亞新 700 最高）');
+  assert.ok((await page.textContent('body')).includes('已抓完官方全部公告'), '標頭要說已抓完');
 }
 
 // CDN 載不到是離線環境的事，不算程式錯
