@@ -58,6 +58,18 @@ if errorlevel 1 (
 )
 
 echo   [3/3] pushing to GitHub
+rem  If the repo was created on GitHub with a README/.gitignore, or the page
+rem  was published from another PC, the remote has commits we do not have.
+rem  Merge them in first (site\ only holds generated files, so this is safe).
+git fetch -q origin
+git rev-parse -q --verify origin/main >nul 2>nul
+if errorlevel 1 goto push
+git merge -q --no-edit --allow-unrelated-histories origin/main
+if errorlevel 1 (
+  echo   Could not merge what is already on GitHub. Resolve inside site\ and run again.
+  goto fail
+)
+:push
 git push -u origin main
 if errorlevel 1 goto fail
 
