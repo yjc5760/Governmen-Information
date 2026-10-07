@@ -257,7 +257,7 @@ tailwind.config = { theme: { extend: { colors: {
     <section data-view="live" hidden>
       <div id="proxyOffline" class="card p-5 mb-4 border-l-4 border-amber-400 hidden">
         <div class="font-bold text-ink-900 text-sm"><i class="fa-solid fa-plug-circle-xmark text-amber-500 mr-2"></i>proxy 沒有回應</div>
-        <p class="text-xs text-slate-600 mt-2">這頁需要本機 proxy。開啟終端機／命令提示字元，切到 <code class="bg-slate-100 px-1 rounded">proxy</code> 資料夾執行 <code class="bg-slate-100 px-1 rounded">npm start</code>，再按下方重試。</p>
+        <p class="text-xs text-slate-600 mt-2">這頁要代查政府電子採購網官網，需要在自己電腦上跑 proxy：執行專案資料夾裡的 <code class="bg-slate-100 px-1 rounded">start-windows.bat</code>（或 <code class="bg-slate-100 px-1 rounded">npm start</code>），再按下方重試。從雲端網址開這頁也可以用，Chrome 若詢問是否允許存取本機網路裝置，請按允許。其他頁面不需要 proxy。</p>
         <button onclick="checkProxy(true)" class="mt-3 px-3 py-2 text-xs border rounded-lg bg-white">重新偵測</button>
       </div>
 

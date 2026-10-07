@@ -8,7 +8,8 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test \"test/**/*.test.mjs\"",
-    "build:exe": "node build/build-exe.mjs"
+    "build:exe": "node build/build-exe.mjs",
+    "build:pages": "node build/build-pages.mjs"
   },
   "dependencies": {
     "cheerio": "^1.0.0",

@@ -7,6 +7,8 @@ node_modules/
 
 # 打包產物（用 npm run build:exe 重建）
 dist/
+# GitHub Pages 產物（是另一個獨立的公開 repo，用 build/發布網頁.bat 發布）
+site/
 
 # 執行期產物
 *.log

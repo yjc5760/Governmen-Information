@@ -353,7 +353,10 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': '*',
-      'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS'
+      'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS',
+      // 讓放在 GitHub Pages（https 公網）的網頁也能呼叫這台電腦上的 proxy：
+      // Chrome 的 Private Network Access 預檢要看到這個標頭才放行
+      'Access-Control-Allow-Private-Network': 'true'
     });
     return res.end();
   }
