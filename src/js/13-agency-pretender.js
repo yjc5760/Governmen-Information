@@ -213,7 +213,7 @@ async function fillPreDetail(){
       '<button onclick="fillAbort=true" class="px-3 py-1 rounded-lg border bg-white text-xs">取消</button></div>'+
       '<div class="h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden"><div class="h-full bg-sky-500 rounded-full" style="width:'+(done/need.length*100)+'%"></div></div>';
     try{
-      const r=await api('/api/tender?unit_id='+encodeURIComponent(unitData.unit_id)+'&job_number='+encodeURIComponent(x.job));
+      const r=await api('/api/tender?unit_id='+encodeURIComponent(unitData.unit_id)+'&job_number='+encodeURIComponent(x.job),{patient:true});
       const recs=r.records||[];
       // 取最新的那則前置公告（更正公告會補正內容，所以更正也要看）
       const pres=recs.filter(q=>{ const y=String((q.brief&&q.brief.type)||''); return y.indexOf('公開閱覽')>=0||y.indexOf('徵求廠商提供參考資料')>=0; })

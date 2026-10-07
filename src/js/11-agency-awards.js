@@ -52,12 +52,13 @@ function fmtWan(n){ if(!n) return '—';
   return n.toLocaleString()+' 元'; }
 
 /* 大機關的公告量很可觀（台電總公司 3.13.31 有 4 萬則、41 頁、每頁 1000 筆約 630KB）。
-   實測連續抓 15 頁之後第 16 頁就會 Failed to fetch——API 對連續大量請求會斷線。
-   所以：每輪只抓固定頁數、頁間拉長間隔、單頁失敗會退避重試，
-   而且不管是被擋還是撞到上限，都保留已經抓到的資料並在畫面上說清楚沒抓完。 */
-const AGENCY_PAGE_CAP = 15;                 // 每輪最多頁數
-const AGENCY_PAGE_GAP = 700;                // 頁間間隔（毫秒）
-const AGENCY_RETRY    = [1500,4000,9000];   // 單頁失敗的退避重試
+   以前實測「連續抓 15 頁之後第 16 頁就 Failed to fetch」，當成 API 會斷線；
+   2026-10-07 查清楚其實是訪客限流（429，見 03-api.js），api() 現在會自動放慢與等待。
+   每輪頁數上限仍保留（一輪 30 頁約 1.5 分鐘），撞到上限或真的失敗都保留已抓到的資料、
+   在畫面上說清楚沒抓完，可以按「繼續往下抓」。 */
+const AGENCY_PAGE_CAP = 30;                 // 每輪最多頁數
+const AGENCY_PAGE_GAP = 0;                  // 節流改由 api() 統一處理（見 03-api.js）
+const AGENCY_RETRY    = [1500,4000];        // 非限流的偶發失敗才在這裡重試；限流由 api() 等待
 
 /* 分頁去重：抓第 N 頁與第 N+1 頁之間官網若新增公告，位移會讓邊界紀錄被重抓
    （實測台電總公司 30,000 筆裡有 34 筆一字不差的重複，多數貼齊每千筆邊界）。
@@ -69,11 +70,11 @@ function unitRecKey(r){
           ((r.brief&&r.brief.companies&&r.brief.companies.names)||[]).join('')].join(' ');
 }
 
-async function fetchUnitPage(unit_id,page,onRetry){
+async function fetchUnitPage(unit_id,page,onRetry,onWait){
   let last;
   for(let i=0;i<=AGENCY_RETRY.length;i++){
     if(i){ if(onRetry) onRetry(i,AGENCY_RETRY[i-1]); await new Promise(s=>setTimeout(s,AGENCY_RETRY[i-1])); }
-    try{ return await api('/api/listbyunit?unit_id='+encodeURIComponent(unit_id)+'&page='+page); }
+    try{ return await api('/api/listbyunit?unit_id='+encodeURIComponent(unit_id)+'&page='+page,{patient:true,onWait}); }
     catch(e){ last=e; }
   }
   throw last;
@@ -88,7 +89,8 @@ async function loadUnitPages(unit_id,startPage,existing,unit_name,say){
     let r;
     try{
       r=await fetchUnitPage(unit_id,page,(i,wait)=>
-        say('第 '+page+' 頁失敗，'+(wait/1000)+' 秒後重試（第 '+i+' 次）…已取得 '+fmtNum(all.length)+' 則'));
+        say('第 '+page+' 頁失敗，'+(wait/1000)+' 秒後重試（第 '+i+' 次）…已取得 '+fmtNum(all.length)+' 則'),
+        (ms,why)=>{ if(why==='limit'||ms>=1500) say('抓取 '+esc(name||unit_id)+'：第 '+page+(tp?(' / '+tp):'')+' 頁，'+apiWaitText(ms,why)+'…已取得 '+fmtNum(all.length)+' 則'); });
     }catch(e){ stop={reason:'error',message:e.message,page}; break; }
     name=r.unit_name||name;
     tp=r.total_page||r.total_pages||tp||1;

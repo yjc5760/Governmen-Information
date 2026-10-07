@@ -879,7 +879,8 @@ test('rivalEta 預估秒數會隨頁數增加，且不會回 0', () => {
   assert.ok(app.rivalEta(1) >= 1, '再少也要回 1 秒，不可顯示「約 0 秒」');
   assert.ok(app.rivalEta(6) < app.rivalEta(16), '6 頁要比 16 頁快');
   assert.ok(app.rivalEta(16) < app.rivalEta(55), '16 頁要比 55 頁快');
-  assert.ok(app.rivalEta(16) <= 30, '16 頁（亞新）實測 15 秒，預估不該離譜：' + app.rivalEta(16));
+  // 2026-10-07 起 API 對訪客限流（約 10 次額度、每 3 秒補 1），16 頁不可能再 15 秒抓完
+  assert.ok(app.rivalEta(16) >= 25 && app.rivalEta(16) <= 45, '16 頁在限流下約半分鐘：' + app.rivalEta(16));
 });
 
 test('vsnapCoverage 把「為什麼只有這麼多」講成一句話', () => {
@@ -1045,3 +1046,51 @@ test('recDateRange 取頭尾、ymdDash 用本地日期（不可早一天）', ()
   assert.equal(app.ymdDash(rg.to), '2026-09-30');
   assert.equal(app.recDateRange([{ date: '' }]), null);
 });
+
+
+/* ---------- API 限流（openfun 訪客：約 10 次額度、每 3 秒補 1；429 沒有 CORS 標頭） ---------- */
+function withFakeNet(responses, fn){
+  const realFetch = app.fetch, realSleep = app.apiSleep, slept = [];
+  let n = 0;
+  app.fetch = async () => {
+    const x = responses[Math.min(n++, responses.length - 1)];
+    if (x === 'cors') throw new TypeError('Failed to fetch');   // 跨來源看到的 429 就長這樣
+    return { ok: x === 200, status: x, json: async () => ({ ok: true }) };
+  };
+  app.apiSleep = async ms => { slept.push(ms); };
+  return fn(slept, () => n).finally(() => { app.fetch = realFetch; app.apiSleep = realSleep; });
+}
+
+test('api：撞到 429 會等一下再試，成功後照常回資料', () =>
+  withFakeNet([429, 200], async (slept, calls) => {
+    const waits = [];
+    const r = await app.api('/api/x', { patient: true, onWait: (ms, why) => waits.push(why) });
+    assert.equal(r.ok, true);
+    assert.equal(calls(), 2);
+    assert.ok(waits.includes('limit'), '要告訴呼叫端是在等限流');
+  }));
+
+test('api：跨來源時 429 只看得到 Failed to fetch，也要當成限流重試', () =>
+  withFakeNet(['cors', 'cors', 200], async (slept, calls) => {
+    const r = await app.api('/api/x', { patient: true, onWait: () => {} });   // 不給 onWait 會走 toast，假 DOM 不支援
+    assert.equal(r.ok, true);
+    assert.equal(calls(), 3);
+  }));
+
+test('api：一直被限流就明確報錯（不可無限等，也不可默默回空）', () =>
+  withFakeNet([429], async () => {
+    await assert.rejects(app.api('/api/x', { patient: true, onWait: () => {} }), /限流/);
+  }));
+
+test('api：連續請求超過額度時會主動放慢（pace）', () =>
+  withFakeNet([200], async () => {
+    const whys = [];
+    for (let i = 0; i < 12; i++) await app.api('/api/x', { onWait: (ms, why) => whys.push(why + ':' + ms) });
+    assert.ok(whys.some(w => w.startsWith('pace:')), '超過 8 次額度後要開始放慢：' + whys.join(','));
+  }));
+
+test('api：一般 HTTP 錯誤（如 500）不當成限流，直接報錯', () =>
+  withFakeNet([500, 200], async (slept, calls) => {
+    await assert.rejects(app.api('/api/x', { patient: true }), /500/);
+    assert.equal(calls(), 1);
+  }));

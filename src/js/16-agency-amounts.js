@@ -12,7 +12,7 @@ function persistAmountCache(){
 }
 
 async function fetchAmount(job_number){
-  const r=await api('/api/tender?unit_id='+encodeURIComponent(unitData.unit_id)+'&job_number='+encodeURIComponent(job_number));
+  const r=await api('/api/tender?unit_id='+encodeURIComponent(unitData.unit_id)+'&job_number='+encodeURIComponent(job_number),{patient:true});
   const recs=r.records||[];
   const aw=recs.filter(x=>isAward((x.brief&&x.brief.type)||''));
   const rec=aw.length?aw[aw.length-1]:recs[recs.length-1];

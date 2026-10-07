@@ -214,7 +214,7 @@ async function runScan(){
   for(let p=from;p<=to;p++){
     meta.innerHTML='<i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i>掃描第 '+p+' 頁…已找到 '+fmtNum(st.hits.length)+' 筆符合';
     let r;
-    try{ r=await api('/api/'+driverEndpoint(st.driver)+'?query='+encodeURIComponent(c[st.driver])+'&page='+p); }
+    try{ r=await api('/api/'+driverEndpoint(st.driver)+'?query='+encodeURIComponent(c[st.driver])+'&page='+p,{patient:true}); }
     catch(e){ stopped={message:e.message,page:p}; break; }
     if(r.total_records!=null) st.total=r.total_records;
     st.tp=r.total_pages||st.tp;

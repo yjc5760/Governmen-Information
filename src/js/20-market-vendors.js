@@ -22,7 +22,7 @@ function renderMarketRanking(){
    要靠 name_key 分（見 splitCompanies）。分完才有辦法區分
    「一起得標的夥伴」和「同場競標的對手」——這兩件事以前被混成一項。 */
 const RIVAL_PER_PAGE = 100;   // 實測值，不是 20
-const RIVAL_PAGE_GAP = 400;
+const RIVAL_PAGE_GAP = 0;     // 節流改由 api() 統一處理（見 03-api.js 的限流說明）
 const VSNAP_MAX = 20;
 const RIVAL_SUGGEST = ['中興工程顧問','台灣世曦工程顧問','亞新工程顧問','中鼎工程','泰興工程顧問','聯邦工程顧問'];
 
@@ -42,7 +42,7 @@ function sameVendor(a,b){
    （那是從我誤以為每頁 20 筆、以及 listbyunit 會斷線的經驗延伸來的，
    但 searchbycompanyname 每頁只約 127KB，不是 listbyunit 的 630KB）。 */
 const RIVAL_PAGE_CAP = 60;                 // 抓到底的硬上限，約 6,000 筆
-const RIVAL_RETRY = [1200,3000,7000];      // 單頁失敗或回空值的退避重試
+const RIVAL_RETRY = [1500,4000];           // 非限流的偶發失敗／空頁才在這裡重試；限流由 api() 等待
 const VPAGE_CHOICES = [[3,'3 頁'],[6,'6 頁'],[12,'12 頁'],[0,'抓到底']];
 
 function rivalLimit(){
@@ -55,13 +55,14 @@ function setVendorPages(v){
   renderRivals();
 }
 /* 抓 n 頁大約要幾秒：每頁一次請求約 0.6 秒，加上頁間間隔 */
-function rivalEta(pages){ return Math.max(1, Math.round(pages*(0.6+RIVAL_PAGE_GAP/1000))); }
+/* 抓 n 頁大約要幾秒：每次請求約 0.6 秒；超過 API 額度的部分每頁要等補額度（約 3.2 秒） */
+function rivalEta(pages){ return Math.max(1, Math.round(pages*0.6 + Math.max(0,pages-API_BUCKET_CAP)*API_REFILL_MS/1000)); }
 
-async function fetchVendorPage(name,page,onRetry){
+async function fetchVendorPage(name,page,onRetry,onWait){
   let last;
   for(let i=0;i<=RIVAL_RETRY.length;i++){
     if(i){ if(onRetry) onRetry(i,RIVAL_RETRY[i-1]); await new Promise(s=>setTimeout(s,RIVAL_RETRY[i-1])); }
-    try{ return await api('/api/searchbycompanyname?query='+encodeURIComponent(name)+'&page='+page); }
+    try{ return await api('/api/searchbycompanyname?query='+encodeURIComponent(name)+'&page='+page,{patient:true,onWait}); }
     catch(e){ last=e; }
   }
   throw last;
@@ -75,7 +76,8 @@ async function fetchVendor(name,pages,say){
     if(say) say('抓取 '+name+'：第 '+p+(tp?(' / '+tp):'')+' 頁…已取得 '+fmtNum(recs.length)+' 筆');
     let r;
     try{
-      r=await fetchVendorPage(name,p,(i,ms)=>{ if(say) say('抓取 '+name+'：第 '+p+' 頁失敗，'+(ms/1000)+' 秒後重試（第 '+i+' 次）'); });
+      r=await fetchVendorPage(name,p,(i,ms)=>{ if(say) say('抓取 '+name+'：第 '+p+' 頁失敗，'+(ms/1000)+' 秒後重試（第 '+i+' 次）'); },
+        (ms,why)=>{ if(say && (why==='limit'||ms>=1500)) say('抓取 '+name+'：第 '+p+(tp?(' / '+tp):'')+' 頁，'+apiWaitText(ms,why)+'…已取得 '+fmtNum(recs.length)+' 筆'); });
     }catch(e){
       stop={reason:'fail', page:p, msg:e.message};   // 保留前面抓到的，不整批丟掉
       break;
@@ -91,7 +93,8 @@ async function fetchVendor(name,pages,say){
        所以只要 total_pages 說後面還有，就先重試，確認過才認定是結束。 */
     if(!rows.length && tp && p<tp){
       try{
-        const r2=await fetchVendorPage(name,p,(i,ms)=>{ if(say) say('抓取 '+name+'：第 '+p+' 頁回空值，'+(ms/1000)+' 秒後重試'); });
+        const r2=await fetchVendorPage(name,p,(i,ms)=>{ if(say) say('抓取 '+name+'：第 '+p+' 頁回空值，'+(ms/1000)+' 秒後重試'); },
+          (ms,why)=>{ if(say && why==='limit') say('抓取 '+name+'：第 '+p+' 頁，'+apiWaitText(ms,why)); });
         rows=r2.records||[];
       }catch(e){}
       if(!rows.length){ stop={reason:'empty', page:p}; break; }

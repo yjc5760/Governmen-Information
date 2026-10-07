@@ -27,7 +27,7 @@ async function refreshTrackedDetails(){
   for(const t of tracked){
     if(t.src==='live') continue;
     try{
-      const r=await api('/api/tender?unit_id='+encodeURIComponent(t.unit_id)+'&job_number='+encodeURIComponent(t.job_number));
+      const r=await api('/api/tender?unit_id='+encodeURIComponent(t.unit_id)+'&job_number='+encodeURIComponent(t.job_number),{patient:true});
       const recs=r.records||[]; if(!recs.length) continue;
       const d=recs[recs.length-1].detail||{};
       t.deadline=pick(d,['截止投標','投標截止'])||t.deadline;
