@@ -60,7 +60,8 @@ proxy 預設只綁 `127.0.0.1`，同一台機器以外連不進來。想從手�
 ├── build/
 │   ├── build-html.mjs      src/ → 標案參謀室.html（Tailwind 在這裡編好內嵌）
 │   ├── build-pages.mjs     產出 GitHub Pages 用的 site/
-│   ├── 發布網頁.bat        建置 site/ 並推到公開的 Pages repo
+│   ├── 發布網頁.bat        建置 site/ 並推到 GitHub 的 main 分支（網頁）
+│   ├── 推送原始碼.bat      把開發檔推到 GitHub 的 source 分支
 │   ├── build-exe.mjs       打包成單一執行檔（Node SEA）
 │   ├── exe-entry.mjs       打包後的入口（自動開瀏覽器、連接埠備援）
 │   └── 打包exe.bat         Windows 一鍵打包
@@ -71,6 +72,18 @@ proxy 預設只綁 `127.0.0.1`，同一台機器以外連不進來。想從手�
 ├── .gitignore
 └── node_modules/        npm install 產生，不進版控
 ```
+
+### 遠端倉庫
+
+同一個 GitHub repo（**公開**）放兩條互不相干的分支：
+
+| 分支 | 內容 | 怎麼更新 |
+| :--- | :--- | :--- |
+| `main` | 只有發布出去的網頁（`site/` 的 `index.html`），GitHub Pages 從這裡上線 | `build/發布網頁.bat` |
+| `source` | 開發用的全部檔案（本資料夾的 git：`src/`、`test/`、`docs/`、`build/`…） | `build/推送原始碼.bat` |
+
+網址：<https://github.com/yjc5760/Governmen-Information>（網頁：<https://yjc5760.github.io/Governmen-Information/>）。
+`node_modules/`、`dist/`、`site/` 不進 `source` 分支（見 `.gitignore`）。
 
 改版靠 git，不要再複製 `xxx.backup-日期.html` 放在資料夾裡（`.gitignore` 已經排除這種檔名）。
 改壞了用 `git diff` / `git checkout -- src/` 還原。
