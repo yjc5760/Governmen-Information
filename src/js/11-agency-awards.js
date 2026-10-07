@@ -269,6 +269,17 @@ function coverageBanner(){
     '</div></div>';
 }
 
+/* 機關頁的區塊很多、頁面很長：上方放一排跳轉鈕（跟著頁首黏住），按了直接捲到該區。
+   沒內容的區塊（例如沒有前置公告）不出現按鈕也不佔位置。 */
+function agencySections(list){
+  const secs=list.filter(x=>x[2]);
+  return '<div class="sticky top-[100px] z-20 -mx-1 px-1 py-2 bg-paper/95 backdrop-blur flex flex-wrap gap-1.5">'+
+      secs.map(x=>'<button onclick="jumpTo('+jsArg(x[0])+')" class="px-3 py-1 rounded-full bg-white border border-slate-200 text-xs text-slate-600 hover:border-jade-500 hover:text-jade-700">'+x[1]+'</button>').join('')+
+    '</div>'+
+    secs.map(x=>'<div id="'+x[0]+'" class="scroll-mt-40">'+x[2]+'</div>').join('');
+}
+function jumpTo(id){ const el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
+
 function renderAgencyDetail(){
   if(!unitData){ document.getElementById('agencyDetail').classList.add('hidden'); return; }
   const cov=agencyCoverage();
@@ -283,42 +294,43 @@ function renderAgencyDetail(){
   const pill=(y,l)=>'<button onclick="setUnitPeriod('+y+')" class="px-3 py-1.5 text-xs rounded-lg '+(unitPeriod===y?'bg-jade-600 text-white font-semibold':'bg-white border hover:bg-slate-50')+'">'+l+'</button>';
 
   document.getElementById('agencyDetail').innerHTML=
-  '<div class="rounded-2xl bg-ink-900 text-white p-5">'+
+  '<div class="card p-5">'+
     '<div class="flex justify-between items-start gap-3">'+
-      '<div class="min-w-0"><div class="eyebrow text-jade-500/90">AGENCY PROFILE</div>'+
-      '<h3 class="text-lg font-bold mt-1 leading-snug"><i class="fa-solid fa-building-columns mr-2 text-jade-400"></i>'+esc(unitData.unit_name)+'</h3>'+
-      '<div class="text-[11px] text-white/40 mt-1 font-mono">'+esc(unitData.unit_id)+' · '+(cov&&cov.complete?'收錄':'已取得')+' '+span+'</div></div>'+
-      '<button onclick="closeAgency()" class="text-white/50 hover:text-white p-1 flex-shrink-0"><i class="fa-solid fa-xmark text-lg"></i></button>'+
+      '<div class="min-w-0">'+
+      '<h3 class="text-lg font-bold text-ink-900 leading-snug"><i class="fa-solid fa-building-columns mr-2 text-jade-600"></i>'+esc(unitData.unit_name)+'</h3>'+
+      '<div class="text-[11px] text-slate-400 mt-1 font-mono">'+esc(unitData.unit_id)+' · '+(cov&&cov.complete?'收錄':'已取得')+' '+span+'</div></div>'+
+      '<button onclick="closeAgency()" class="text-slate-500 hover:text-slate-600 p-1 flex-shrink-0"><i class="fa-solid fa-xmark text-lg"></i></button>'+
     '</div>'+
     '<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5">'+
-      '<div><div class="text-2xl font-bold">'+fmtNum(unitData.records.length)+
-        (cov&&cov.total&&!cov.complete?'<span class="text-sm font-normal text-white/40"> / '+fmtNum(cov.total)+'</span>':'')+
-        '</div><div class="text-[11px] text-white/50 mt-0.5">'+(cov&&cov.complete?'全期間公告':'已取得公告（未抓完）')+'</div></div>'+
-      '<div><div class="text-2xl font-bold">'+fmtNum(awards.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">決標紀錄（'+(unitPeriod?('近'+unitPeriod+'年'):'全期')+'）</div></div>'+
-      '<div><div class="text-2xl font-bold">'+fmtNum(tenders.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">招標公告（同期）</div></div>'+
-      '<div><div class="text-2xl font-bold">'+fmtNum(vs.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">得標廠商家數</div></div>'+
+      '<div><div class="text-2xl font-bold text-ink-900">'+fmtNum(unitData.records.length)+
+        (cov&&cov.total&&!cov.complete?'<span class="text-sm font-normal text-slate-400"> / '+fmtNum(cov.total)+'</span>':'')+
+        '</div><div class="text-[11px] text-slate-500 mt-0.5">'+(cov&&cov.complete?'全期間公告':'已取得公告（未抓完）')+'</div></div>'+
+      '<div><div class="text-2xl font-bold text-ink-900">'+fmtNum(awards.length)+'</div><div class="text-[11px] text-slate-500 mt-0.5">決標紀錄（'+(unitPeriod?('近'+unitPeriod+'年'):'全期')+'）</div></div>'+
+      '<div><div class="text-2xl font-bold text-ink-900">'+fmtNum(tenders.length)+'</div><div class="text-[11px] text-slate-500 mt-0.5">招標公告（同期）</div></div>'+
+      '<div><div class="text-2xl font-bold text-ink-900">'+fmtNum(vs.length)+'</div><div class="text-[11px] text-slate-500 mt-0.5">得標廠商家數</div></div>'+
     '</div>'+
-    '<div class="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">'+
-      '<span class="text-white/50">已補齊決標金額合計</span><span class="text-lg font-bold text-jade-300">'+fmtWan(sum)+'</span>'+
-      '<span class="text-white/40">'+known.length+' / '+awards.length+' 案有金額'+(need?('，'+need+' 案未補'):'')+'</span>'+
-      (unitData.dropped?('<span class="text-white/40" title="抓分頁時官網又新增了公告，位移導致邊界紀錄被重抓，已濾掉">已濾除 '+fmtNum(unitData.dropped)+' 筆分頁重複</span>'):'')+
-      '<button onclick="listUnitRecords()" class="ml-auto px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs">在情報中心列出全部公告</button>'+
+    '<div class="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">'+
+      '<span class="text-slate-500">已補齊決標金額合計</span><span class="text-lg font-bold text-jade-700">'+fmtWan(sum)+'</span>'+
+      '<span class="text-slate-400">'+known.length+' / '+awards.length+' 案有金額'+(need?('，'+need+' 案未補'):'')+'</span>'+
+      (unitData.dropped?('<span class="text-slate-400" title="抓分頁時官網又新增了公告，位移導致邊界紀錄被重抓，已濾掉">已濾除 '+fmtNum(unitData.dropped)+' 筆分頁重複</span>'):'')+
+      '<button onclick="listUnitRecords()" class="ml-auto px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs">在情報中心列出全部公告</button>'+
     '</div>'+
   '</div>'+
 
   coverageBanner()+
-  preTenderBlock()+
-
+  agencySections([
+    ['agPre','前置公告', preTenderBlock()],
+    ['agVendors','得標廠商排行',
   '<div class="grid lg:grid-cols-3 gap-4">'+
     '<div class="lg:col-span-2 card p-5">'+
       '<div class="flex justify-between items-start flex-wrap gap-2">'+
-        '<div><div class="eyebrow">AGENCY VENDORS</div><h3 class="font-bold text-ink-900 mt-1">得標廠商排行</h3></div>'+
+        '<div><h3 class="font-bold text-ink-900">得標廠商排行</h3></div>'+
         '<div class="flex gap-1.5">'+pill(3,'3 年')+pill(5,'5 年')+pill(10,'10 年')+pill(0,'全部')+'</div>'+
       '</div>'+
       '<div class="flex flex-wrap gap-2 mt-3">'+
         '<input id="vendorQ" type="text" value="'+esc(unitVendorQ)+'" oninput="onVendorQ(this.value)" placeholder="搜尋此機關得標廠商…" class="flex-1 min-w-[180px] px-3 py-2 border rounded-xl text-sm">'+
-        '<button onclick="setUnitSort(\'count\')" class="px-3 py-2 text-xs rounded-lg '+(unitSort==='count'?'bg-ink-800 text-white':'border bg-white')+'">依件數</button>'+
-        '<button onclick="setUnitSort(\'amount\')" class="px-3 py-2 text-xs rounded-lg '+(unitSort==='amount'?'bg-ink-800 text-white':'border bg-white')+'">依金額</button>'+
+        '<button onclick="setUnitSort(\'count\')" class="px-3 py-2 text-xs rounded-lg '+(unitSort==='count'?'bg-jade-600 text-white':'border bg-white')+'">依件數</button>'+
+        '<button onclick="setUnitSort(\'amount\')" class="px-3 py-2 text-xs rounded-lg '+(unitSort==='amount'?'bg-jade-600 text-white':'border bg-white')+'">依金額</button>'+
       '</div>'+
       (need?('<div class="mt-3 flex items-center gap-2 flex-wrap text-xs bg-amber-50 border border-amber-100 rounded-xl p-3">'+
         '<i class="fa-solid fa-coins text-amber-600"></i><span class="text-amber-800">還有 <strong>'+need+'</strong> 案沒有決標金額（公告清單不含金額，要逐案抓）。</span>'+
@@ -326,21 +338,21 @@ function renderAgencyDetail(){
        :(awards.length?'<div class="mt-3 text-xs text-jade-700 bg-jade-50 border border-jade-100 rounded-xl p-3"><i class="fa-solid fa-circle-check mr-1"></i>本期間決標金額已全部補齊。</div>':''))+
       '<div id="fillProgress" class="hidden mt-3 text-xs bg-slate-50 border rounded-xl p-3"></div>'+
       '<div id="vendorRank" class="mt-3"></div>'+
-      '<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">金額為公告的「總決標金額」。複數決標／共同投標的案子，官方只公布一個總額，這裡會同時計入每一家得標廠商，看到 <span class="tag bg-slate-100 text-slate-600">共同</span> 標記代表該筆有重複計算風險。</p>'+
+      '<p class="hint text-[11px] text-slate-400 mt-3 leading-relaxed">金額為公告的「總決標金額」。複數決標／共同投標的案子，官方只公布一個總額，這裡會同時計入每一家得標廠商，看到 <span class="tag bg-slate-100 text-slate-600">共同</span> 標記代表該筆有重複計算風險。</p>'+
     '</div>'+
 
     '<div class="card p-5">'+
-      '<div class="eyebrow">PROFILE</div><h3 class="font-bold text-ink-900 mt-1">採購輪廓</h3>'+
+      '<h3 class="font-bold text-ink-900">採購輪廓</h3>'+
       '<div class="text-[11px] text-slate-400 mt-0.5">全期間收錄</div>'+
       distBlock('公告類型', tally(unitData.records, r=>recTy(r)||'未分類'), 7)+
       distBlock('年度公告量', yearTally(unitData.records), 10)+
     '</div>'+
-  '</div>'+
-
-  ratioBlock()+
-  flopBlock()+
-  debarredBlock()+
-  rhythmBlock();
+  '</div>'],
+    ['agRatio','落標率', ratioBlock()],
+    ['agFlop','流標機會', flopBlock()],
+    ['agDebar','拒絕往來', debarredBlock()],
+    ['agRhythm','發包節奏', rhythmBlock()]
+  ]);
 
   saveAgencySnapshot();
   renderVendorRank();

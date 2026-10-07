@@ -4,7 +4,9 @@ function go(page){
   document.querySelectorAll('[data-view]').forEach(s=>s.hidden = s.dataset.view!==page);
   document.querySelectorAll('.navitem').forEach(n=>n.classList.toggle('active', n.dataset.page===page));
   document.getElementById('pageTitle').textContent=PAGE_TITLE[page]||'';
-  closeDrawer(); window.scrollTo(0,0);
+  const tab=document.querySelector('.navitem.active');          // 手機上分頁列會橫向捲動，把目前這頁捲進畫面
+  if(tab && tab.scrollIntoView) tab.scrollIntoView({block:'nearest',inline:'nearest'});
+  window.scrollTo(0,0);
   if(page==='overview') renderOverview();
   if(page==='live'){ renderWatchChips(); checkProxy(false); }
   if(page==='agencies') renderAgencies();

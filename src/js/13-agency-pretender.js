@@ -154,9 +154,9 @@ function preTenderBlock(){
   const needDetail=open.slice(0,PRE_DETAIL_MAX).filter(x=>!preDetail[preKey(x.job)]).length;
 
   let h='<div class="card p-5 border-l-4 border-sky-400">'+
-    '<div class="eyebrow">PRE-TENDER RADAR</div>'+
-    '<h3 class="font-bold text-ink-900 mt-1">前置公告雷達</h3>'+
-    '<p class="text-xs text-slate-500 mt-1 leading-relaxed">'+
+    ''+
+    '<h3 class="font-bold text-ink-900">前置公告雷達</h3>'+
+    '<p class="hint text-xs text-slate-500 mt-1 leading-relaxed">'+
       '<strong>招標公告是落後指標</strong>——公告出來時資格條款已經寫死。'+
       '真正的時間窗在它前面：<span class="tag bg-sky-100 text-sky-700">公開閱覽</span>是招標文件草案公開供閱覽，'+
       '<span class="tag bg-indigo-100 text-indigo-700">公開徵求</span>是 RFI、通常還在寫規範的階段。'+
@@ -190,7 +190,7 @@ function preTenderBlock(){
       '<div class="space-y-2 mt-2">'+done.slice(0,20).map(x=>preRow(x,st)).join('')+'</div>'+
       (done.length>20?('<p class="text-[11px] text-slate-400 mt-2">另有 '+(done.length-20)+' 案未顯示。</p>'):'')+'</details>';
   }
-  h+='<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">'+
+  h+='<p class="hint text-[11px] text-slate-400 mt-3 leading-relaxed">'+
     '「尚未招標」與推估區間都只反映<strong>已抓取的公告</strong>——機關沒抓完的話，招標公告可能已經出了只是還沒抓到。'+
     '資格條款是公告的<strong>摘要</strong>，完整條款在公開閱覽文件裡（公告有列閱覽地點與網址）。'+
     '實測有招標日早於前置公告日的反常資料，那種配對會標出來且不計入時間窗統計。</p>';

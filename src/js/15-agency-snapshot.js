@@ -99,8 +99,8 @@ function renderAgencyCompare(){
 
   let h='<details class="card p-0"'+((wasOpen||sel.length>=2)?' open':'')+'>'+
     '<summary class="p-4 cursor-pointer flex items-center justify-between flex-wrap gap-2">'+
-      '<div><div class="eyebrow">AGENCY COMPARE</div>'+
-      '<h3 class="font-bold text-ink-900 mt-1">機關對比</h3>'+
+      '<div>'+
+      '<h3 class="font-bold text-ink-900">機關對比</h3>'+
       '<p class="text-xs text-slate-500 mt-0.5">看過的機關會自動存一份指標快照，勾 2–4 個就能並排比。目前有 '+ids.length+' 個快照'+(sel.length?('，已勾 '+sel.length+' 個'):'')+'。</p></div>'+
       '<i class="fa-solid fa-chevron-down text-slate-300"></i>'+
     '</summary>'+
@@ -160,7 +160,7 @@ function renderAgencyCompare(){
     h+='</tr>';
   });
   h+='</tbody></table></div>'+
-    '<p class="text-[11px] text-slate-400 leading-relaxed">粗體標的是該列最高的一格：流標率、集中度這類「越高對新進者越不利」的用紅色，其餘用綠色。'+
+    '<p class="hint text-[11px] text-slate-400 leading-relaxed">粗體標的是該列最高的一格：流標率、集中度這類「越高對新進者越不利」的用紅色，其餘用綠色。'+
     '快照只存算好的數字、不存原始公告，所以不會佔太多空間，但也<strong>不會自動更新</strong>——機關有新公告要再點一次那個機關才會刷新。</p>';
   box.innerHTML=h+'</div></details>';
 }
@@ -175,9 +175,9 @@ function rhythmBlock(){
   const reLag=median(fails.filter(f=>f.lag!=null&&f.lag<1200).map(f=>f.lag));
 
   let h='<div class="card p-5">'+
-    '<div class="eyebrow">PROCUREMENT RHYTHM</div>'+
-    '<h3 class="font-bold text-ink-900 mt-1">發包節奏</h3>'+
-    '<p class="text-xs text-slate-500 mt-1">把年度性標案的名稱正規化成系列（去掉「115年度」這類年份），用歷年招標日的間隔中位數推下一次。全部由這份公告清單算出，沒有另外打 API。</p>'+
+    ''+
+    '<h3 class="font-bold text-ink-900">發包節奏</h3>'+
+    '<p class="hint text-xs text-slate-500 mt-1">把年度性標案的名稱正規化成系列（去掉「115年度」這類年份），用歷年招標日的間隔中位數推下一次。全部由這份公告清單算出，沒有另外打 API。</p>'+
     (function(){ const c=agencyCoverage();
       return (c&&!c.complete)
         ? '<p class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-2.5 mt-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>公告只抓到 '+fmtNum(c.got)+' 則（第 1–'+c.pf+' / '+c.tp+' 頁），而且是最近的那些。<strong>早年的招標紀錄還沒進來，所以系列的次數會偏低、間隔可能算錯。</strong>要當預測用請先把公告抓完。</p>'
@@ -224,7 +224,7 @@ function rhythmBlock(){
       '</tr>';
   });
   h+='</tbody></table></div>'+
-     '<p class="text-[11px] text-slate-400 mt-2 leading-relaxed">「間隔」是各輪招標日相差天數的中位數。距離上一次不到 '+MIN_ROUND_GAP+' 天的視為<strong>同一輪</strong>（流標重招、分批、第2次公告），不會被算成一個短週期。'+
+     '<p class="hint text-[11px] text-slate-400 mt-2 leading-relaxed">「間隔」是各輪招標日相差天數的中位數。距離上一次不到 '+MIN_ROUND_GAP+' 天的視為<strong>同一輪</strong>（流標重招、分批、第2次公告），不會被算成一個短週期。'+
      '間隔接近 365／730／1095 天才標為年度／兩年／三年，其餘標<strong>不規律</strong>並淡化——那些多半是偶發採購，預估值沒有意義。'+
      '次數只有 2 次的預估很脆弱，要一起看「慣例月份」的命中比例。過期未出現的系列可能已經停辦、改名或併案。</p></div>';
 
@@ -243,7 +243,7 @@ function rhythmBlock(){
           '</div>'+
         '</div></div>';
     });
-    h+='</div><p class="text-[11px] text-slate-400 mt-2 leading-relaxed">「尚未重招」是指這個標案系列在流標日之後還沒有出現新的招標公告——通常代表機關會再來一次，也常伴隨放寬資格或調整預算。名稱比對用的是正規化後的系列鍵，改名重招可能認不出來。</p></div>';
+    h+='</div><p class="hint text-[11px] text-slate-400 mt-2 leading-relaxed">「尚未重招」是指這個標案系列在流標日之後還沒有出現新的招標公告——通常代表機關會再來一次，也常伴隨放寬資格或調整預算。名稱比對用的是正規化後的系列鍵，改名重招可能認不出來。</p></div>';
   }
 
   return h+'</div>';

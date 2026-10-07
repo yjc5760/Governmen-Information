@@ -114,9 +114,9 @@ function flopBlock(){
   const needDetail=open.slice(0,FLOP_DETAIL_MAX).filter(function(x){ return !flopDetail[flopKey(x.job)]; }).length;
 
   let h='<div class="card p-5">'+
-    '<div class="eyebrow">FAILED TENDER RADAR</div>'+
-    '<h3 class="font-bold text-ink-900 mt-1">流標機會清單</h3>'+
-    '<p class="text-xs text-slate-500 mt-1 leading-relaxed">同一案號流標愈多次，機關愈可能<strong>拆包、放寬廠商資格或調高預算</strong>，這三件事都是切入點。'+
+    ''+
+    '<h3 class="font-bold text-ink-900">流標機會清單</h3>'+
+    '<p class="hint text-xs text-slate-500 mt-1 leading-relaxed">同一案號流標愈多次，機關愈可能<strong>拆包、放寬廠商資格或調高預算</strong>，這三件事都是切入點。'+
     '決標公告是落後指標，無法決標公告才是「機關卡住、正在想辦法」的訊號。</p>'+
     '<div class="flex flex-wrap gap-2 mt-3 text-[11px]">'+
       '<span class="tag bg-slate-100 text-slate-700">曾流標 '+rows.length+' 案</span>'+
@@ -142,7 +142,7 @@ function flopBlock(){
       '<div class="space-y-2 mt-2">'+done.slice(0,20).map(flopRow).join('')+'</div>'+
       (done.length>20?('<p class="text-[11px] text-slate-400 mt-2">另有 '+(done.length-20)+' 案未顯示。</p>'):'')+'</details>';
   }
-  h+='<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">序列只涵蓋<strong>已抓取的公告</strong>，機關沒抓完的話早年的流標看不到。'+
+  h+='<p class="hint text-[11px] text-slate-400 mt-3 leading-relaxed">序列只涵蓋<strong>已抓取的公告</strong>，機關沒抓完的話早年的流標看不到。'+
     '「尚未決標」是指最後一次流標之後還沒有決標公告——也可能是機關放棄了、改用其他案號重招，或決標公告還沒抓到。'+
     '一案多則流標公告（複數決標各品項一則）會被算成多次，看得到流標日相同就是這種情形。</p>';
   return h+'</div>';
@@ -205,8 +205,8 @@ function debarredBlock(){
   const alsoWon=[...names].filter(v=>winners[v]).map(v=>({name:v,count:winners[v]}))
                           .sort((a,b)=>b.count-a.count);
   let h='<div class="card p-5">'+
-    '<div class="eyebrow">DEBARRED VENDORS</div>'+
-    '<h3 class="font-bold text-ink-900 mt-1">拒絕往來廠商（停權名單）</h3>'+
+    ''+
+    '<h3 class="font-bold text-ink-900">拒絕往來廠商（停權名單）</h3>'+
     '<p class="text-xs text-slate-500 mt-1">這個機關公告過的廠商拒絕往來名單，共 <strong>'+list.length+'</strong> 則、涉及 <strong>'+names.size+'</strong> 家。查對手或潛在協力廠商有沒有被停權時可以看這裡。</p>';
   if(alsoWon.length){
     h+='<div class="mt-3 rounded-xl bg-rose-50 border border-rose-100 p-3">'+
@@ -228,7 +228,7 @@ function debarredBlock(){
       '</div></div>').join('')+
     '</div>'+
     (list.length>40?('<p class="text-[11px] text-slate-400 mt-2">另有 '+(list.length-40)+' 則未顯示。</p>'):'')+
-    '<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">同一案同一天可能有多則公告（一家廠商一則）。名單有「更正公告」代表原公告被修正過，'+
+    '<p class="hint text-[11px] text-slate-400 mt-3 leading-relaxed">同一案同一天可能有多則公告（一家廠商一則）。名單有「更正公告」代表原公告被修正過，'+
     '這裡不會自動抵銷——要確認廠商目前的停權狀態，請到工程會的政府電子採購網查「拒絕往來廠商」專區。</p>';
   return h+'</div>';
 }

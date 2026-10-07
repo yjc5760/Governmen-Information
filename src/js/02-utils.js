@@ -35,8 +35,16 @@ function modal(id,show){ const m=document.getElementById(id); m.classList.toggle
     document.getElementById('proxyBaseInput').value=proxyBase();
     document.getElementById('apiTokenInput').value=apiToken();
   } }
-function openDrawer(){ document.getElementById('drawer').classList.remove('-translate-x-full'); document.getElementById('drawerBackdrop').classList.remove('hidden'); }
-function closeDrawer(){ document.getElementById('drawer').classList.add('-translate-x-full'); document.getElementById('drawerBackdrop').classList.add('hidden'); }
+/* 說明文字（class="hint"）預設收起，畫面只留輸入框、按鈕與數字；
+   頁首「說明」按鈕一次展開全部，選擇記在這台瀏覽器。
+   資料不完整、涵蓋率、樣本數這類警示不是 hint，永遠顯示。 */
+const HINT_KEY='pi_show_hints';
+function applyHints(on){
+  document.body.classList.toggle('show-hints',!!on);
+  const b=document.getElementById('hintToggle');
+  if(b){ b.classList.toggle('bg-jade-50',!!on); b.classList.toggle('text-jade-700',!!on); b.classList.toggle('border-jade-500',!!on); }
+}
+function toggleHints(){ const on=!document.body.classList.contains('show-hints'); LS.set(HINT_KEY,on); applyHints(on); }
 function ymd(d){ return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
 function fmtNum(n){ return (n==null||isNaN(n))?'—':Number(n).toLocaleString(); }
 

@@ -86,7 +86,7 @@ function renderCompare(){
     ((!cmpView.custom&&cmpView.preset===k)?'bg-jade-600 text-white font-semibold':'bg-white border hover:bg-slate-50')+'">'+l+'</button>';
   let t='<div class="card p-4 mb-4 space-y-3">'+
     '<div class="flex items-center justify-between flex-wrap gap-2">'+
-      '<div><div class="eyebrow">COMPARE</div><h3 class="font-bold text-ink-900 mt-1">'+compareList.length+' 案並排 · '+built.length+' 個欄位，其中 '+diffCount+' 個有差異</h3></div>'+
+      '<div><h3 class="font-bold text-ink-900">'+compareList.length+' 案並排 · '+built.length+' 個欄位，其中 '+diffCount+' 個有差異</h3></div>'+
       '<div class="flex gap-2 flex-wrap">'+
         '<button onclick="exportCompareCsv()" class="px-3 py-1.5 text-xs border rounded-lg hover:bg-slate-50"><i class="fa-solid fa-file-csv mr-1"></i>匯出 CSV</button>'+
         '<button onclick="clearCompare()" class="px-3 py-1.5 text-xs border rounded-lg hover:bg-rose-50 text-rose-600">全部清空</button>'+
@@ -141,7 +141,7 @@ function renderCompare(){
     h+='</tr>';
   });
   h+='</tbody></table>'+
-     '<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">淡黃底、標 <i class="fa-solid fa-not-equal text-amber-500"></i> 的列代表各案值不同，是實際要比的地方；全部相同的列已淡化。「決標金額」與「決標／預算比」來自本機的決標金額快取，沒補齊的案子會是空的——到機關洞察按「補齊決標金額」。</p>';
+     '<p class="hint text-[11px] text-slate-400 mt-3 leading-relaxed">淡黃底、標 <i class="fa-solid fa-not-equal text-amber-500"></i> 的列代表各案值不同，是實際要比的地方；全部相同的列已淡化。「決標金額」與「決標／預算比」來自本機的決標金額快取，沒補齊的案子會是空的——到機關洞察按「補齊決標金額」。</p>';
   box.innerHTML=h;
 }
 

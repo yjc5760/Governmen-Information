@@ -12,6 +12,6 @@ module.exports = {
   theme: { extend: { colors: {
     ink:   { 900:'#0B2E2C', 800:'#103F3B', 700:'#16514B' },
     jade:  { 700:'#0B5F55', 600:'#0F7168', 500:'#159183', 100:'#DCEDE9', 50:'#EEF4F2' },
-    paper: '#EDF2F1'
+    paper: '#F6F8F7'
   } } }
 };

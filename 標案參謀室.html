@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 由 src/ 自動產生（npm run build）。請改 src/ 底下的檔案，不要直接改這份。 build-hash:4ffa1e38a9be5db4 -->
+<!-- 由 src/ 自動產生（npm run build）。請改 src/ 底下的檔案，不要直接改這份。 build-hash:6ec1924c85a6577e -->
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -316,15 +316,37 @@ height: auto;
 [hidden]:where(:not([hidden="until-found"])) {
 display: none;
 }
-body { background:#EDF2F1; }
+body { background:#F6F8F7; }
 ::-webkit-scrollbar { width:6px; height:6px; }
-::-webkit-scrollbar-thumb { background:#c3d3cf; border-radius:4px; }
-.eyebrow { letter-spacing:.14em; font-size:11px; font-weight:700; color:#0F7168; }
-.card { background:#fff; border-radius:14px; box-shadow:0 1px 2px rgba(16,63,59,.06); }
+::-webkit-scrollbar-thumb { background:#cfd9d6; border-radius:4px; }
+.eyebrow { font-size:12px; font-weight:600; color:#0F7168; }
+.card { background:#fff; border:1px solid #E3EAE8; border-radius:12px; }
 .tag { display:inline-block; padding:3px 12px; border-radius:999px; font-size:11px; font-weight:600; }
-.navitem { display:flex; align-items:center; gap:.75rem; padding:.6rem .9rem; border-radius:10px; font-size:.9rem; color:#cfe0dc; cursor:pointer; }
-.navitem:hover { background:rgba(255,255,255,.06); }
-.navitem.active { background:rgba(21,145,131,.18); color:#fff; font-weight:600; box-shadow:inset 3px 0 0 #159183; }
+.navitem { display:flex; align-items:center; gap:.45rem; padding:.65rem .85rem; font-size:.875rem; color:#475569;
+border-bottom:2px solid transparent; white-space:nowrap; cursor:pointer; flex-shrink:0; }
+.navitem i { color:#94a3b8; font-size:.8rem; }
+.navitem:hover { color:#0B5F55; background:#F3F7F6; }
+.navitem.active { color:#0B5F55; border-bottom-color:#0F7168; font-weight:600; }
+.navitem.active i { color:#0F7168; }
+#navTrackCount:empty, #navCompareCount:empty { display:none; }
+#tabBar { scrollbar-width:none; }
+#tabBar::-webkit-scrollbar { display:none; }
+@media (max-width: 1023px) {
+#tabBar { padding-right:28px; -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent); mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent); }
+}
+.hint { display:none; }
+body.show-hints .hint { display:block; }
+.sr-only {
+position: absolute;
+width: 1px;
+height: 1px;
+padding: 0;
+margin: -1px;
+overflow: hidden;
+clip: rect(0, 0, 0, 0);
+white-space: nowrap;
+border-width: 0;
+}
 .pointer-events-none {
 pointer-events: none;
 }
@@ -352,17 +374,17 @@ top: 0px;
 .top-4 {
 top: 1rem;
 }
+.top-\[100px\] {
+top: 100px;
+}
 .z-10 {
 z-index: 10;
 }
+.z-20 {
+z-index: 20;
+}
 .z-30 {
 z-index: 30;
-}
-.z-40 {
-z-index: 40;
-}
-.z-50 {
-z-index: 50;
 }
 .z-\[65\] {
 z-index: 65;
@@ -386,9 +408,20 @@ margin: 0.25rem;
 margin-left: -0.25rem;
 margin-right: -0.25rem;
 }
+.mx-1 {
+margin-left: 0.25rem;
+margin-right: 0.25rem;
+}
+.mx-2 {
+margin-left: 0.5rem;
+margin-right: 0.5rem;
+}
 .mx-auto {
 margin-left: auto;
 margin-right: auto;
+}
+.-mb-px {
+margin-bottom: -1px;
 }
 .mb-0\.5 {
 margin-bottom: 0.125rem;
@@ -465,14 +498,14 @@ margin-top: 1.25rem;
 .mt-6 {
 margin-top: 1.5rem;
 }
-.mt-auto {
-margin-top: auto;
-}
 .block {
 display: block;
 }
 .inline-block {
 display: inline-block;
+}
+.inline {
+display: inline;
 }
 .flex {
 display: flex;
@@ -492,26 +525,23 @@ aspect-ratio: 1 / 1;
 .h-1\.5 {
 height: 0.375rem;
 }
-.h-10 {
-height: 2.5rem;
-}
 .h-12 {
 height: 3rem;
 }
-.h-16 {
-height: 4rem;
+.h-14 {
+height: 3.5rem;
 }
 .h-2 {
 height: 0.5rem;
+}
+.h-5 {
+height: 1.25rem;
 }
 .h-7 {
 height: 1.75rem;
 }
 .h-8 {
 height: 2rem;
-}
-.h-9 {
-height: 2.25rem;
 }
 .h-full {
 height: 100%;
@@ -540,9 +570,6 @@ min-height: 100vh;
 .w-1\.5 {
 width: 0.375rem;
 }
-.w-10 {
-width: 2.5rem;
-}
 .w-12 {
 width: 3rem;
 }
@@ -564,17 +591,14 @@ width: 1.5rem;
 .w-7 {
 width: 1.75rem;
 }
-.w-72 {
-width: 18rem;
-}
 .w-8 {
 width: 2rem;
 }
-.w-9 {
-width: 2.25rem;
-}
 .w-full {
 width: 100%;
+}
+.w-px {
+width: 1px;
 }
 .min-w-0 {
 min-width: 0px;
@@ -606,6 +630,9 @@ max-width: 48rem;
 .max-w-6xl {
 max-width: 72rem;
 }
+.max-w-\[260px\] {
+max-width: 260px;
+}
 .max-w-lg {
 max-width: 32rem;
 }
@@ -624,10 +651,6 @@ flex-shrink: 0;
 .border-collapse {
 border-collapse: collapse;
 }
-.-translate-x-full {
---tw-translate-x: -100%;
-transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
-}
 .translate-x-8 {
 --tw-translate-x: 2rem;
 transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
@@ -637,6 +660,9 @@ cursor: pointer;
 }
 .select-none {
 user-select: none;
+}
+.scroll-mt-40 {
+scroll-margin-top: 10rem;
 }
 .grid-cols-1 {
 grid-template-columns: repeat(1, minmax(0, 1fr));
@@ -709,11 +735,6 @@ row-gap: 0.125rem;
 }
 .gap-y-2 {
 row-gap: 0.5rem;
-}
-.space-x-2 > :not([hidden]) ~ :not([hidden]) {
---tw-space-x-reverse: 0;
-margin-right: calc(0.5rem * var(--tw-space-x-reverse));
-margin-left: calc(0.5rem * calc(1 - var(--tw-space-x-reverse)));
 }
 .space-y-0\.5 > :not([hidden]) ~ :not([hidden]) {
 --tw-space-y-reverse: 0;
@@ -874,15 +895,16 @@ border-color: rgb(224 242 254 / var(--tw-border-opacity, 1));
 --tw-border-opacity: 1;
 border-color: rgb(56 189 248 / var(--tw-border-opacity, 1));
 }
+.border-slate-100 {
+--tw-border-opacity: 1;
+border-color: rgb(241 245 249 / var(--tw-border-opacity, 1));
+}
 .border-slate-200 {
 --tw-border-opacity: 1;
 border-color: rgb(226 232 240 / var(--tw-border-opacity, 1));
 }
 .border-transparent {
 border-color: transparent;
-}
-.border-white\/10 {
-border-color: rgb(255 255 255 / 0.1);
 }
 .bg-amber-100 {
 --tw-bg-opacity: 1;
@@ -906,9 +928,6 @@ background-color: rgb(245 158 11 / var(--tw-bg-opacity, 1));
 --tw-bg-opacity: 1;
 background-color: rgb(217 119 6 / var(--tw-bg-opacity, 1));
 }
-.bg-black\/40 {
-background-color: rgb(0 0 0 / 0.4);
-}
 .bg-black\/50 {
 background-color: rgb(0 0 0 / 0.5);
 }
@@ -923,18 +942,6 @@ background-color: rgb(52 211 153 / var(--tw-bg-opacity, 1));
 .bg-indigo-100 {
 --tw-bg-opacity: 1;
 background-color: rgb(224 231 255 / var(--tw-bg-opacity, 1));
-}
-.bg-ink-700 {
---tw-bg-opacity: 1;
-background-color: rgb(22 81 75 / var(--tw-bg-opacity, 1));
-}
-.bg-ink-800 {
---tw-bg-opacity: 1;
-background-color: rgb(16 63 59 / var(--tw-bg-opacity, 1));
-}
-.bg-ink-900 {
---tw-bg-opacity: 1;
-background-color: rgb(11 46 44 / var(--tw-bg-opacity, 1));
 }
 .bg-jade-100 {
 --tw-bg-opacity: 1;
@@ -951,6 +958,9 @@ background-color: rgb(21 145 131 / var(--tw-bg-opacity, 1));
 .bg-jade-600 {
 --tw-bg-opacity: 1;
 background-color: rgb(15 113 104 / var(--tw-bg-opacity, 1));
+}
+.bg-paper\/95 {
+background-color: rgb(246 248 247 / 0.95);
 }
 .bg-rose-100 {
 --tw-bg-opacity: 1;
@@ -988,6 +998,10 @@ background-color: rgb(241 245 249 / var(--tw-bg-opacity, 1));
 --tw-bg-opacity: 1;
 background-color: rgb(226 232 240 / var(--tw-bg-opacity, 1));
 }
+.bg-slate-400 {
+--tw-bg-opacity: 1;
+background-color: rgb(148 163 184 / var(--tw-bg-opacity, 1));
+}
 .bg-slate-50 {
 --tw-bg-opacity: 1;
 background-color: rgb(248 250 252 / var(--tw-bg-opacity, 1));
@@ -1003,11 +1017,8 @@ background-color: rgb(100 116 139 / var(--tw-bg-opacity, 1));
 --tw-bg-opacity: 1;
 background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
 }
-.bg-white\/10 {
-background-color: rgb(255 255 255 / 0.1);
-}
-.bg-white\/5 {
-background-color: rgb(255 255 255 / 0.05);
+.bg-white\/95 {
+background-color: rgb(255 255 255 / 0.95);
 }
 .p-0 {
 padding: 0px;
@@ -1055,10 +1066,6 @@ padding-right: 0.625rem;
 .px-3 {
 padding-left: 0.75rem;
 padding-right: 0.75rem;
-}
-.px-3\.5 {
-padding-left: 0.875rem;
-padding-right: 0.875rem;
 }
 .px-4 {
 padding-left: 1rem;
@@ -1232,9 +1239,6 @@ color: rgb(67 56 202 / var(--tw-text-opacity, 1));
 --tw-text-opacity: 1;
 color: rgb(11 46 44 / var(--tw-text-opacity, 1));
 }
-.text-jade-500\/90 {
-color: rgb(21 145 131 / 0.9);
-}
 .text-jade-600 {
 --tw-text-opacity: 1;
 color: rgb(15 113 104 / var(--tw-text-opacity, 1));
@@ -1299,18 +1303,6 @@ color: rgb(30 41 59 / var(--tw-text-opacity, 1));
 --tw-text-opacity: 1;
 color: rgb(255 255 255 / var(--tw-text-opacity, 1));
 }
-.text-white\/40 {
-color: rgb(255 255 255 / 0.4);
-}
-.text-white\/50 {
-color: rgb(255 255 255 / 0.5);
-}
-.text-white\/60 {
-color: rgb(255 255 255 / 0.6);
-}
-.text-white\/90 {
-color: rgb(255 255 255 / 0.9);
-}
 .underline {
 text-decoration-line: underline;
 }
@@ -1339,6 +1331,11 @@ box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #
 .filter {
 filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow);
 }
+.backdrop-blur {
+--tw-backdrop-blur: blur(8px);
+-webkit-backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);
+backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);
+}
 .transition {
 transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
 transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -1349,27 +1346,19 @@ transition-property: all;
 transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 transition-duration: 150ms;
 }
-.transition-transform {
-transition-property: transform;
-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-transition-duration: 150ms;
-}
-.duration-200 {
-transition-duration: 200ms;
-}
 .duration-300 {
 transition-duration: 300ms;
 }
 .last\:border-0:last-child {
 border-width: 0px;
 }
+.hover\:border-jade-500:hover {
+--tw-border-opacity: 1;
+border-color: rgb(21 145 131 / var(--tw-border-opacity, 1));
+}
 .hover\:bg-amber-700:hover {
 --tw-bg-opacity: 1;
 background-color: rgb(180 83 9 / var(--tw-bg-opacity, 1));
-}
-.hover\:bg-ink-900:hover {
---tw-bg-opacity: 1;
-background-color: rgb(11 46 44 / var(--tw-bg-opacity, 1));
 }
 .hover\:bg-jade-100:hover {
 --tw-bg-opacity: 1;
@@ -1395,9 +1384,6 @@ background-color: rgb(241 245 249 / var(--tw-bg-opacity, 1));
 --tw-bg-opacity: 1;
 background-color: rgb(248 250 252 / var(--tw-bg-opacity, 1));
 }
-.hover\:bg-white\/20:hover {
-background-color: rgb(255 255 255 / 0.2);
-}
 .hover\:text-amber-600:hover {
 --tw-text-opacity: 1;
 color: rgb(217 119 6 / var(--tw-text-opacity, 1));
@@ -1413,10 +1399,6 @@ color: rgb(244 63 94 / var(--tw-text-opacity, 1));
 .hover\:text-slate-600:hover {
 --tw-text-opacity: 1;
 color: rgb(71 85 105 / var(--tw-text-opacity, 1));
-}
-.hover\:text-white:hover {
---tw-text-opacity: 1;
-color: rgb(255 255 255 / var(--tw-text-opacity, 1));
 }
 .hover\:underline:hover {
 text-decoration-line: underline;
@@ -1473,25 +1455,20 @@ padding-left: 1.5rem;
 padding-right: 1.5rem;
 }
 }
+@media (min-width: 768px) {
+.md\:inline {
+display: inline;
+}
+}
 @media (min-width: 1024px) {
 .lg\:col-span-2 {
 grid-column: span 2 / span 2;
-}
-.lg\:hidden {
-display: none;
-}
-.lg\:translate-x-0 {
---tw-translate-x: 0px;
-transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
 }
 .lg\:grid-cols-2 {
 grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .lg\:grid-cols-3 {
 grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.lg\:pl-72 {
-padding-left: 18rem;
 }
 }
 </style>
@@ -1520,7 +1497,7 @@ padding-left: 18rem;
       <div>
         <label class="block text-xs font-semibold text-slate-600 mb-1">API Token</label>
         <input type="text" id="apiTokenInput" placeholder="ofk_..." class="w-full text-sm px-3 py-2 border rounded-lg font-mono text-[11px]">
-        <p class="text-[11px] text-slate-400 mt-1">預設帶入官方 pcc-viewer 公開設定檔裡的 token。若被限流，換成自己申請的。</p>
+        <p class="hint text-[11px] text-slate-400 mt-1">預設帶入官方 pcc-viewer 公開設定檔裡的 token。若被限流，換成自己申請的。</p>
       </div>
       <button onclick="testApi()" class="px-3 py-2 text-xs border rounded-lg hover:bg-slate-50"><i class="fa-solid fa-plug mr-1"></i>測試 API</button>
     </div>
@@ -1530,7 +1507,7 @@ padding-left: 18rem;
       <div>
         <label class="block text-xs font-semibold text-slate-600 mb-1">本機 proxy 位址</label>
         <input type="text" id="proxyBaseInput" placeholder="http://localhost:5178" class="w-full text-sm px-3 py-2 border rounded-lg font-mono text-[11px]">
-        <p class="text-[11px] text-slate-400 mt-1">需要在電腦上跑 proxy／server.js。沒跑的話，「官網即時查」那頁不會有資料，其他頁不受影響。</p>
+        <p class="hint text-[11px] text-slate-400 mt-1">需要在電腦上跑 proxy／server.js。沒跑的話，「官網即時查」那頁不會有資料，其他頁不受影響。</p>
       </div>
       <button onclick="testProxy()" class="px-3 py-2 text-xs border rounded-lg hover:bg-slate-50"><i class="fa-solid fa-plug mr-1"></i>測試 proxy</button>
     </div>
@@ -1567,7 +1544,7 @@ padding-left: 18rem;
   <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[88vh] flex flex-col">
     <div class="flex justify-between items-start gap-3 p-5 border-b">
       <div class="min-w-0">
-        <div class="eyebrow">AGENCY AWARD CASES</div>
+        
         <h3 id="vmTitle" class="text-base font-bold text-ink-900 mt-1 leading-snug"></h3>
       </div>
       <button onclick="modal('vendorModal',false)" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-xl"></i></button>
@@ -1578,52 +1555,33 @@ padding-left: 18rem;
   </div>
 </div>
 
-<!-- ===== 側欄 ===== -->
-<div id="drawerBackdrop" onclick="closeDrawer()" class="fixed inset-0 bg-black/40 z-40 hidden lg:hidden"></div>
-<aside id="drawer" class="fixed top-0 left-0 h-full w-72 bg-ink-900 z-50 p-4 flex flex-col gap-1 -translate-x-full lg:translate-x-0 transition-transform duration-200">
-  <div class="flex items-center justify-between mb-4 px-1">
-    <div class="flex items-center gap-2.5">
-      <div class="w-9 h-9 rounded-xl bg-jade-600 flex items-center justify-center text-white"><i class="fa-solid fa-bullseye"></i></div>
-      <span class="text-white font-bold">標案參謀室</span>
-    </div>
-    <button onclick="closeDrawer()" class="lg:hidden text-white/60 hover:text-white p-2"><i class="fa-solid fa-xmark"></i></button>
-  </div>
-
-  <div class="px-3 py-2.5 rounded-xl bg-white/5 flex items-center gap-2.5 mb-2">
-    <div class="w-8 h-8 rounded-full bg-jade-600 text-white text-xs flex items-center justify-center font-bold">公</div>
-    <span class="text-sm text-white/90">公開資料瀏覽</span>
-  </div>
-  <div class="navitem active" data-page="overview"><i class="fa-solid fa-table-cells-large w-4"></i>總覽</div>
-  <div class="navitem" data-page="tenders"><i class="fa-solid fa-file-magnifying-glass w-4"></i>標案情報中心</div>
-  <div class="navitem" data-page="live"><i class="fa-solid fa-tower-broadcast w-4"></i>官網即時查 <span id="navLiveDot" class="ml-auto w-2 h-2 rounded-full bg-slate-500"></span></div>
-  <div class="navitem" data-page="agencies"><i class="fa-solid fa-building-columns w-4"></i>機關洞察</div>
-  <div class="navitem" data-page="market"><i class="fa-solid fa-code-compare w-4"></i>市場與廠商</div>
-  <div class="navitem" data-page="calendar"><i class="fa-regular fa-calendar w-4"></i>採購行事曆</div>
-
-  <div class="px-3 py-2.5 rounded-xl bg-white/5 flex items-center gap-2.5 mt-4 mb-2">
-    <div class="w-8 h-8 rounded-full bg-ink-700 text-white text-xs flex items-center justify-center font-bold">我</div>
-    <span class="text-sm text-white/90">我的工作區</span>
-  </div>
-  <div class="navitem" data-page="tracked"><i class="fa-regular fa-bookmark w-4"></i>追蹤清單 <span id="navTrackCount" class="ml-auto text-[11px] bg-jade-600 text-white px-1.5 rounded"></span></div>
-  <div class="navitem" data-page="compare"><i class="fa-solid fa-scale-balanced w-4"></i>標案比較 <span id="navCompareCount" class="ml-auto text-[11px] bg-jade-600 text-white px-1.5 rounded"></span></div>
-
-  <div class="mt-auto space-y-2">
-    <div id="apiStatus" class="text-[11px] text-white/50 px-3 py-2 rounded-lg bg-white/5">資料來源：g0v 標案 API</div>
-    <button onclick="modal('settingsModal',true)" class="w-full text-left navitem"><i class="fa-solid fa-gear w-4"></i>設定</button>
-  </div>
-</aside>
-
-<!-- ===== 主體 ===== -->
-<div class="lg:pl-72">
-  <header class="sticky top-0 z-30 bg-white border-b border-slate-200">
-    <div class="h-16 px-4 sm:px-6 flex items-center justify-between gap-3">
-      <div class="flex items-center gap-3 min-w-0">
-        <button onclick="openDrawer()" class="lg:hidden w-10 h-10 border rounded-xl flex items-center justify-center"><i class="fa-solid fa-bars"></i></button>
-        <h1 id="pageTitle" class="text-lg font-bold text-ink-900 truncate">總覽</h1>
+<!-- ===== 頁首與分頁（淺色、橫向） ===== -->
+<div>
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6">
+      <div class="h-14 flex items-center gap-3">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-jade-50 text-jade-700 flex items-center justify-center"><i class="fa-solid fa-bullseye"></i></div>
+          <span class="font-bold text-ink-900 whitespace-nowrap">標案參謀室</span>
+        </div>
+        <h1 id="pageTitle" class="sr-only">總覽</h1>
+        <div class="ml-auto flex items-center gap-2 min-w-0">
+          <span id="apiStatus" class="hidden md:inline text-[11px] text-slate-400 truncate max-w-[260px]">資料來源：g0v 標案 API</span>
+          <button id="hintToggle" onclick="toggleHints()" title="顯示或收起各區塊的詳細說明" class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-slate-50 whitespace-nowrap"><i class="fa-regular fa-circle-question mr-1"></i>說明</button>
+          <button onclick="modal('settingsModal',true)" title="設定" class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-slate-50 whitespace-nowrap"><i class="fa-solid fa-gear"></i><span class="hidden sm:inline ml-1">設定</span></button>
+        </div>
       </div>
-      <button onclick="modal('settingsModal',true)" class="px-3.5 py-2 rounded-xl bg-jade-600 hover:bg-jade-700 text-white text-sm font-semibold flex items-center gap-2">
-        <i class="fa-solid fa-gear"></i><span class="hidden sm:inline">設定</span>
-      </button>
+      <nav id="tabBar" class="flex items-end gap-0.5 overflow-x-auto -mb-px" aria-label="頁面">
+        <div class="navitem active" data-page="overview"><i class="fa-solid fa-table-cells-large"></i>總覽</div>
+        <div class="navitem" data-page="tenders"><i class="fa-solid fa-magnifying-glass"></i>標案情報中心</div>
+        <div class="navitem" data-page="live"><i class="fa-solid fa-tower-broadcast"></i>官網即時查<span id="navLiveDot" class="w-2 h-2 rounded-full bg-slate-500"></span></div>
+        <div class="navitem" data-page="agencies"><i class="fa-solid fa-building-columns"></i>機關洞察</div>
+        <div class="navitem" data-page="market"><i class="fa-solid fa-code-compare"></i>市場與廠商</div>
+        <div class="navitem" data-page="calendar"><i class="fa-regular fa-calendar"></i>採購行事曆</div>
+        <span class="self-center w-px h-5 bg-slate-200 mx-2 flex-shrink-0"></span>
+        <div class="navitem" data-page="tracked"><i class="fa-regular fa-bookmark"></i>追蹤清單<span id="navTrackCount" class="text-[11px] bg-jade-600 text-white px-1.5 rounded"></span></div>
+        <div class="navitem" data-page="compare"><i class="fa-solid fa-scale-balanced"></i>標案比較<span id="navCompareCount" class="text-[11px] bg-jade-600 text-white px-1.5 rounded"></span></div>
+      </nav>
     </div>
   </header>
 
@@ -1631,9 +1589,9 @@ padding-left: 18rem;
 
     <!-- ===== 總覽 ===== -->
     <section data-view="overview">
-      <div class="card p-5 border-l-4 border-jade-600 mb-5">
-        <div class="eyebrow">PUBLIC TENDER INTELLIGENCE</div>
-        <h2 class="text-2xl font-bold text-ink-900 mt-1.5 leading-snug">公開標案情報，免登入直接查</h2>
+      <div class="card p-5 mb-5">
+        
+        <h2 class="text-xl font-bold text-ink-900 leading-snug">公開標案情報，免登入直接查</h2>
         <button onclick="go('tenders')" class="mt-4 w-full py-3 rounded-xl bg-jade-600 hover:bg-jade-700 text-white font-semibold flex items-center justify-center gap-2">
           <i class="fa-solid fa-magnifying-glass"></i> 搜尋政府採購商機
         </button>
@@ -1657,15 +1615,15 @@ padding-left: 18rem;
       <div class="card p-5 mb-5">
         <div class="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <div class="eyebrow">SYNC</div>
-            <h3 class="font-bold text-ink-900 mt-1">同步近期公告</h3>
-            <p class="text-xs text-slate-500 mt-1">逐日抓取全國公告存進瀏覽器，機關洞察與行事曆都靠這份快取。</p>
+            
+            <h3 class="font-bold text-ink-900">同步近期公告</h3>
+            <p class="hint text-xs text-slate-500 mt-1">逐日抓取全國公告存進瀏覽器，機關洞察與行事曆都靠這份快取。</p>
           </div>
           <div class="flex items-center gap-2">
             <select id="syncDays" class="text-sm p-2 border rounded-lg bg-white">
               <option value="3">近 3 日</option><option value="7" selected>近 7 日</option><option value="14">近 14 日</option>
             </select>
-            <button onclick="syncDays()" id="syncBtn" class="px-4 py-2 bg-ink-800 hover:bg-ink-900 text-white rounded-lg text-sm font-medium">開始同步</button>
+            <button onclick="syncDays()" id="syncBtn" class="px-4 py-2 bg-jade-600 hover:bg-jade-700 text-white rounded-lg text-sm font-medium">開始同步</button>
           </div>
         </div>
         <div id="syncProgress" class="hidden mt-3 text-xs text-jade-700 bg-jade-50 border border-jade-100 rounded-lg p-3"></div>
@@ -1674,7 +1632,7 @@ padding-left: 18rem;
 
       <div class="card p-5">
         <div class="flex items-center justify-between">
-          <div><div class="eyebrow">DEADLINES</div><h3 class="font-bold text-ink-900 mt-1">追蹤中近期截止</h3></div>
+          <div><h3 class="font-bold text-ink-900">追蹤中近期截止</h3></div>
           <button onclick="go('tracked')" class="text-jade-600 text-sm font-semibold">查看全部 ›</button>
         </div>
         <div id="overviewDeadlines" class="mt-4 divide-y divide-slate-100"></div>
@@ -1684,7 +1642,7 @@ padding-left: 18rem;
     <!-- ===== 標案情報中心 ===== -->
     <section data-view="tenders" hidden>
       <div class="card p-5 mb-4">
-        <div class="eyebrow">SEARCH</div>
+        
         <div class="mt-3 space-y-2">
           <div>
             <label for="searchQuery" class="block text-[11px] font-semibold text-slate-600 mb-1">標案名稱</label>
@@ -1708,7 +1666,7 @@ padding-left: 18rem;
                      class="w-full px-3 py-2.5 border rounded-xl text-sm font-mono focus:ring-2 focus:ring-jade-500 focus:outline-none">
             </div>
           </div>
-          <p class="text-[11px] text-slate-400 leading-relaxed">四個欄位是 <strong>AND</strong>——填幾個就要同時成立。標案 API 一次只能用一個條件查，而且<strong>沒有機關查詢端點</strong>，所以程式會挑選擇性最高的當主查詢（機關索引唯一命中 › 統一編號 › 廠商名稱 › 標案名稱），其餘在前端篩。畫面上會標明主查詢是哪個、掃了多少筆，別把部分結果當成全部。</p>
+          <p class="hint text-[11px] text-slate-400 leading-relaxed">四個欄位是 <strong>AND</strong>——填幾個就要同時成立。標案 API 一次只能用一個條件查，而且<strong>沒有機關查詢端點</strong>，所以程式會挑選擇性最高的當主查詢（機關索引唯一命中 › 統一編號 › 廠商名稱 › 標案名稱），其餘在前端篩。畫面上會標明主查詢是哪個、掃了多少筆，別把部分結果當成全部。</p>
           <div class="flex gap-2">
             <button onclick="doSearch(1)" class="flex-1 py-2.5 rounded-xl bg-jade-600 hover:bg-jade-700 text-white font-semibold text-sm"><i class="fa-solid fa-magnifying-glass mr-1"></i>搜尋</button>
             <button onclick="clearSearchConds()" class="px-4 py-2.5 border rounded-xl text-xs hover:bg-slate-50 whitespace-nowrap">清空條件</button>
@@ -1733,9 +1691,9 @@ padding-left: 18rem;
       </div>
 
       <div class="card p-5 mb-4">
-        <div class="eyebrow">LIVE SEARCH</div>
-        <h3 class="font-bold text-ink-900 mt-1">等標期內即時查詢</h3>
-        <p class="text-xs text-slate-500 mt-1">直接查政府電子採購網，只回傳尚未截止的案子，清單就帶截止日與預算。</p>
+        
+        <h3 class="font-bold text-ink-900">等標期內即時查詢</h3>
+        <p class="hint text-xs text-slate-500 mt-1">直接查政府電子採購網，只回傳尚未截止的案子，清單就帶截止日與預算。</p>
         <div class="mt-3 space-y-2">
           <input id="liveKeyword" type="text" placeholder="關鍵字，例如：燃氣、統包、監造" class="w-full px-4 py-3 border rounded-xl text-sm focus:ring-2 focus:ring-jade-500 focus:outline-none">
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1767,11 +1725,11 @@ padding-left: 18rem;
       <div class="card p-5 mb-4">
         <div class="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <div class="eyebrow">WATCHLIST</div>
-            <h3 class="font-bold text-ink-900 mt-1">關鍵字監看</h3>
-            <p class="text-xs text-slate-500 mt-1">存一組固定關鍵字，一次跑完並依截止日排序。</p>
+            
+            <h3 class="font-bold text-ink-900">關鍵字監看</h3>
+            <p class="hint text-xs text-slate-500 mt-1">存一組固定關鍵字，一次跑完並依截止日排序。</p>
           </div>
-          <button onclick="runWatch()" class="px-4 py-2 bg-ink-800 hover:bg-ink-900 text-white rounded-lg text-sm font-medium whitespace-nowrap"><i class="fa-solid fa-rotate mr-1"></i>更新監看</button>
+          <button onclick="runWatch()" class="px-4 py-2 bg-jade-600 hover:bg-jade-700 text-white rounded-lg text-sm font-medium whitespace-nowrap"><i class="fa-solid fa-rotate mr-1"></i>更新監看</button>
         </div>
         <div id="watchChips" class="flex flex-wrap gap-2 mt-4"></div>
         <div class="flex gap-2 mt-3">
@@ -1787,10 +1745,10 @@ padding-left: 18rem;
     <!-- ===== 機關洞察 ===== -->
     <section data-view="agencies" hidden>
       <div class="card p-5 mb-4">
-        <div class="eyebrow">AGENCY INSIGHT</div>
-        <h3 class="font-bold text-ink-900 mt-1">選一個機關，看它歷年發包給誰</h3>
-        <p class="text-xs text-slate-500 mt-1">選定後會直接向 API 抓該機關的<strong>全期間</strong>公告，不受同步天數限制。</p>
-        <p class="text-xs text-slate-400 mt-1">下方是<strong>已認識的機關</strong>——標案 API 沒有「用機關名稱查機關」的端點，機關只能從抓下來的公告裡累積。同步過的公告、查詢結果、開過的標案都會自動加進來，且不會隨公告快取被裁掉。</p>
+        
+        <h3 class="font-bold text-ink-900">選一個機關，看它歷年發包給誰</h3>
+        <p class="hint text-xs text-slate-500 mt-1">選定後會直接向 API 抓該機關的<strong>全期間</strong>公告，不受同步天數限制。</p>
+        <p class="hint text-xs text-slate-400 mt-1">下方是<strong>已認識的機關</strong>——標案 API 沒有「用機關名稱查機關」的端點，機關只能從抓下來的公告裡累積。同步過的公告、查詢結果、開過的標案都會自動加進來，且不會隨公告快取被裁掉。</p>
         <div class="flex gap-2 mt-3">
           <input id="agencyFilter" type="text" placeholder="篩選已認識的機關，例如：台灣電力" class="flex-1 px-3 py-2 border rounded-xl text-sm">
           <button onclick="renderAgencies()" class="px-4 py-2 bg-jade-600 text-white rounded-xl text-sm font-medium">篩選</button>
@@ -1804,8 +1762,8 @@ padding-left: 18rem;
     <!-- ===== 市場與廠商 ===== -->
     <section data-view="market" hidden>
       <div class="card p-5 mb-4">
-        <div class="eyebrow">MARKET</div>
-        <h3 class="font-bold text-ink-900 mt-1">得標廠商查詢</h3>
+        
+        <h3 class="font-bold text-ink-900">得標廠商查詢</h3>
         <div class="flex gap-2 mt-3">
           <input id="companyQuery" type="text" placeholder="廠商名稱或統一編號" class="flex-1 px-3 py-2 border rounded-xl text-sm">
           <button onclick="doCompanySearch()" class="px-4 py-2 bg-jade-600 text-white rounded-xl text-sm font-medium">查詢</button>
@@ -1814,8 +1772,8 @@ padding-left: 18rem;
       <div id="rivalPanel" class="mb-4"></div>
       <div id="vendorCompare" class="mb-4"></div>
       <div class="card p-5 mb-4">
-        <div class="eyebrow">FROM CACHE</div>
-        <h3 class="font-bold text-ink-900 mt-1">已同步期間的得標廠商排行</h3>
+        
+        <h3 class="font-bold text-ink-900">已同步期間的得標廠商排行</h3>
         <div id="marketRanking" class="mt-3 space-y-2 text-sm"></div>
       </div>
       <div id="companyResults" class="space-y-3"></div>
@@ -1844,7 +1802,7 @@ padding-left: 18rem;
     <!-- ===== 追蹤清單 ===== -->
     <section data-view="tracked" hidden>
       <div class="flex items-center justify-between mb-3">
-        <p class="text-xs text-slate-500">追蹤的案子會把詳情快取下來，截止日與預算才能參與統計與行事曆。</p>
+        <p class="hint text-xs text-slate-500">追蹤的案子會把詳情快取下來，截止日與預算才能參與統計與行事曆。</p>
         <button onclick="refreshTrackedDetails()" class="px-3 py-2 text-xs border rounded-lg bg-white"><i class="fa-solid fa-rotate mr-1"></i>更新詳情</button>
       </div>
       <div id="trackedList" class="space-y-3"></div>
@@ -1858,12 +1816,12 @@ padding-left: 18rem;
       </div>
     </section>
 
-    <footer class="text-center text-[11px] text-slate-400 py-6 space-x-2">
+    <footer class="text-center text-[11px] text-slate-400 py-6">
       <span>標案資料來源：行政院公共工程委員會政府電子採購網（經 g0v 標案 API）</span><br>
-      <button onclick="exportBackup()" class="underline hover:text-slate-600">匯出備份</button>
-      <button onclick="document.getElementById('backupInput').click()" class="underline hover:text-slate-600">匯入備份</button>
-      <button onclick="clearCaches()" class="underline hover:text-amber-600">只清快取</button>
-      <button onclick="wipeAll()" class="underline hover:text-rose-500">清除全部資料</button>
+      <button onclick="exportBackup()" class="underline hover:text-slate-600 mx-1">匯出備份</button>
+      <button onclick="document.getElementById('backupInput').click()" class="underline hover:text-slate-600 mx-1">匯入備份</button>
+      <button onclick="clearCaches()" class="underline hover:text-amber-600 mx-1">只清快取</button>
+      <button onclick="wipeAll()" class="underline hover:text-rose-500 mx-1">清除全部資料</button>
       <input type="file" id="backupInput" accept=".json" class="hidden">
       <div id="storageMeter" class="mt-3 max-w-sm mx-auto"></div>
     </footer>
@@ -1989,8 +1947,16 @@ function modal(id,show){ const m=document.getElementById(id); m.classList.toggle
     document.getElementById('proxyBaseInput').value=proxyBase();
     document.getElementById('apiTokenInput').value=apiToken();
   } }
-function openDrawer(){ document.getElementById('drawer').classList.remove('-translate-x-full'); document.getElementById('drawerBackdrop').classList.remove('hidden'); }
-function closeDrawer(){ document.getElementById('drawer').classList.add('-translate-x-full'); document.getElementById('drawerBackdrop').classList.add('hidden'); }
+/* 說明文字（class="hint"）預設收起，畫面只留輸入框、按鈕與數字；
+   頁首「說明」按鈕一次展開全部，選擇記在這台瀏覽器。
+   資料不完整、涵蓋率、樣本數這類警示不是 hint，永遠顯示。 */
+const HINT_KEY='pi_show_hints';
+function applyHints(on){
+  document.body.classList.toggle('show-hints',!!on);
+  const b=document.getElementById('hintToggle');
+  if(b){ b.classList.toggle('bg-jade-50',!!on); b.classList.toggle('text-jade-700',!!on); b.classList.toggle('border-jade-500',!!on); }
+}
+function toggleHints(){ const on=!document.body.classList.contains('show-hints'); LS.set(HINT_KEY,on); applyHints(on); }
 function ymd(d){ return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
 function fmtNum(n){ return (n==null||isNaN(n))?'—':Number(n).toLocaleString(); }
 
@@ -2148,7 +2114,7 @@ async function checkProxy(loud){
   try{ await proxyGet('/api/health'); proxyOk=true; if(loud) toast('proxy 連線正常','success'); }
   catch(e){ proxyOk=false; if(loud) toast('proxy 沒有回應：'+e.message,'error'); }
   const dot=document.getElementById('navLiveDot');
-  if(dot) dot.className='ml-auto w-2 h-2 rounded-full '+(proxyOk?'bg-emerald-400':'bg-slate-500');
+  if(dot) dot.className='w-2 h-2 rounded-full '+(proxyOk?'bg-emerald-400':'bg-slate-500');
   document.getElementById('proxyOffline').classList.toggle('hidden',proxyOk);
   return proxyOk;
 }
@@ -2256,7 +2222,7 @@ async function runWatch(){
     meta.textContent='共 '+r.count+' 件等標期內案件，其中 '+r.closingSoon.length+' 件 14 日內截止'+
       (r.errors&&r.errors.length?('；'+r.errors.length+' 組關鍵字失敗'):'');
     if(r.closingSoon.length){
-      closing.innerHTML='<div class="eyebrow px-1">CLOSING SOON — 14 日內截止</div>';
+      closing.innerHTML='<div class="eyebrow px-1">14 日內截止</div>';
       r.closingSoon.forEach(x=>closing.appendChild(liveCard(x)));
     }
     const rest=r.records.filter(x=>!r.closingSoon.some(c=>c.caseId===x.caseId));
@@ -2274,7 +2240,9 @@ function go(page){
   document.querySelectorAll('[data-view]').forEach(s=>s.hidden = s.dataset.view!==page);
   document.querySelectorAll('.navitem').forEach(n=>n.classList.toggle('active', n.dataset.page===page));
   document.getElementById('pageTitle').textContent=PAGE_TITLE[page]||'';
-  closeDrawer(); window.scrollTo(0,0);
+  const tab=document.querySelector('.navitem.active');          // 手機上分頁列會橫向捲動，把目前這頁捲進畫面
+  if(tab && tab.scrollIntoView) tab.scrollIntoView({block:'nearest',inline:'nearest'});
+  window.scrollTo(0,0);
   if(page==='overview') renderOverview();
   if(page==='live'){ renderWatchChips(); checkProxy(false); }
   if(page==='agencies') renderAgencies();
@@ -2648,7 +2616,7 @@ async function runScan(){
 
   const pager=document.getElementById('searchPager');
   let pb='<div class="flex flex-wrap gap-2 justify-center">';
-  if(!st.exhausted && !stopped) pb+='<button onclick="runScan()" class="px-3 py-2 text-xs rounded-lg bg-ink-800 hover:bg-ink-900 text-white font-medium"><i class="fa-solid fa-angles-down mr-1"></i>繼續掃下 '+SEARCH_SCAN_PAGES+' 頁</button>';
+  if(!st.exhausted && !stopped) pb+='<button onclick="runScan()" class="px-3 py-2 text-xs rounded-lg bg-jade-600 hover:bg-jade-700 text-white font-medium"><i class="fa-solid fa-angles-down mr-1"></i>繼續掃下 '+SEARCH_SCAN_PAGES+' 頁</button>';
   if(stopped) pb+='<button onclick="runScan()" class="px-3 py-2 text-xs rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium">重試</button>';
   if(st.agHits && st.agHits.length){
     pb+='<span class="text-[11px] text-slate-400 self-center">機關索引命中 '+st.agHits.length+' 個，改走精準：</span>'+
@@ -2826,13 +2794,13 @@ function renderTenderBody(){
   let html='<div class="flex flex-wrap gap-1.5">'+typeTag(t.type)+(t.date?'<span class="tag bg-slate-100 text-slate-600">'+esc(t.date)+'</span>':'')+
     (t.records.length>1?'<span class="tag bg-amber-100 text-amber-800">'+t.records.length+' 次公告紀錄</span>':'')+'</div>';
 
-  html+='<div class="rounded-2xl bg-ink-900 text-white p-5 space-y-4">'+
-    '<div class="eyebrow text-jade-500/90">投標關鍵資訊</div>'+
-    '<div><div class="text-xs text-white/60"><i class="fa-regular fa-calendar mr-1.5"></i>投標截止</div>'+
-    '<div class="text-xl font-bold mt-1">'+(t.deadline?esc(t.deadline):'—')+
-    (left!=null&&left>=0?' <span class="text-sm font-normal text-jade-300">（剩 '+left+' 天）</span>':(left!=null?' <span class="text-sm font-normal text-white/40">（已截止）</span>':''))+'</div></div>'+
-    '<div class="border-t border-white/10 pt-3"><div class="text-xs text-white/60"><i class="fa-solid fa-dollar-sign mr-1.5"></i>採購預算</div>'+
-    '<div class="text-xl font-bold mt-1">'+(parseMoney(t.budget)?('$'+fmtNum(parseMoney(t.budget))):(esc(t.budget)||'未公開'))+'</div></div>'+
+  html+='<div class="rounded-2xl bg-jade-50 border border-jade-100 p-5 space-y-4">'+
+    '<div class="eyebrow">投標關鍵資訊</div>'+
+    '<div><div class="text-xs text-slate-500"><i class="fa-regular fa-calendar mr-1.5"></i>投標截止</div>'+
+    '<div class="text-xl font-bold text-ink-900">'+(t.deadline?esc(t.deadline):'—')+
+    (left!=null&&left>=0?' <span class="text-sm font-normal text-jade-700">（剩 '+left+' 天）</span>':(left!=null?' <span class="text-sm font-normal text-slate-400">（已截止）</span>':''))+'</div></div>'+
+    '<div class="border-t border-jade-100 pt-3"><div class="text-xs text-slate-500"><i class="fa-solid fa-dollar-sign mr-1.5"></i>採購預算</div>'+
+    '<div class="text-xl font-bold text-ink-900">'+(parseMoney(t.budget)?('$'+fmtNum(parseMoney(t.budget))):(esc(t.budget)||'未公開'))+'</div></div>'+
     '</div>';
 
   html+=gateBlock(d);
@@ -2944,7 +2912,7 @@ function renderAgencies(){
       '<p class="text-sm text-slate-500">還沒有認識任何機關。</p>'+
       '<p class="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">標案 API 沒有「用機關名稱查機關」的端點，機關只能從抓下來的公告裡認識。先同步幾天公告，或到標案情報中心查一筆標案、按「機關採購輪廓」進來。</p>'+
       '<div class="flex gap-2 justify-center flex-wrap pt-1">'+
-      '<button onclick="syncFromAgencies()" class="px-4 py-2 bg-ink-800 hover:bg-ink-900 text-white rounded-lg text-xs font-medium">同步近 7 日公告</button>'+
+      '<button onclick="syncFromAgencies()" class="px-4 py-2 bg-jade-600 hover:bg-jade-700 text-white rounded-lg text-xs font-medium">同步近 7 日公告</button>'+
       '<button onclick="go(\'tenders\')" class="px-4 py-2 border rounded-lg text-xs hover:bg-slate-50">去標案情報中心</button>'+
       '</div></div>';
     return;
@@ -3294,6 +3262,17 @@ function coverageBanner(){
     '</div></div>';
 }
 
+/* 機關頁的區塊很多、頁面很長：上方放一排跳轉鈕（跟著頁首黏住），按了直接捲到該區。
+   沒內容的區塊（例如沒有前置公告）不出現按鈕也不佔位置。 */
+function agencySections(list){
+  const secs=list.filter(x=>x[2]);
+  return '<div class="sticky top-[100px] z-20 -mx-1 px-1 py-2 bg-paper/95 backdrop-blur flex flex-wrap gap-1.5">'+
+      secs.map(x=>'<button onclick="jumpTo('+jsArg(x[0])+')" class="px-3 py-1 rounded-full bg-white border border-slate-200 text-xs text-slate-600 hover:border-jade-500 hover:text-jade-700">'+x[1]+'</button>').join('')+
+    '</div>'+
+    secs.map(x=>'<div id="'+x[0]+'" class="scroll-mt-40">'+x[2]+'</div>').join('');
+}
+function jumpTo(id){ const el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
+
 function renderAgencyDetail(){
   if(!unitData){ document.getElementById('agencyDetail').classList.add('hidden'); return; }
   const cov=agencyCoverage();
@@ -3308,42 +3287,43 @@ function renderAgencyDetail(){
   const pill=(y,l)=>'<button onclick="setUnitPeriod('+y+')" class="px-3 py-1.5 text-xs rounded-lg '+(unitPeriod===y?'bg-jade-600 text-white font-semibold':'bg-white border hover:bg-slate-50')+'">'+l+'</button>';
 
   document.getElementById('agencyDetail').innerHTML=
-  '<div class="rounded-2xl bg-ink-900 text-white p-5">'+
+  '<div class="card p-5">'+
     '<div class="flex justify-between items-start gap-3">'+
-      '<div class="min-w-0"><div class="eyebrow text-jade-500/90">AGENCY PROFILE</div>'+
-      '<h3 class="text-lg font-bold mt-1 leading-snug"><i class="fa-solid fa-building-columns mr-2 text-jade-400"></i>'+esc(unitData.unit_name)+'</h3>'+
-      '<div class="text-[11px] text-white/40 mt-1 font-mono">'+esc(unitData.unit_id)+' · '+(cov&&cov.complete?'收錄':'已取得')+' '+span+'</div></div>'+
-      '<button onclick="closeAgency()" class="text-white/50 hover:text-white p-1 flex-shrink-0"><i class="fa-solid fa-xmark text-lg"></i></button>'+
+      '<div class="min-w-0">'+
+      '<h3 class="text-lg font-bold text-ink-900 leading-snug"><i class="fa-solid fa-building-columns mr-2 text-jade-600"></i>'+esc(unitData.unit_name)+'</h3>'+
+      '<div class="text-[11px] text-slate-400 mt-1 font-mono">'+esc(unitData.unit_id)+' · '+(cov&&cov.complete?'收錄':'已取得')+' '+span+'</div></div>'+
+      '<button onclick="closeAgency()" class="text-slate-500 hover:text-slate-600 p-1 flex-shrink-0"><i class="fa-solid fa-xmark text-lg"></i></button>'+
     '</div>'+
     '<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5">'+
-      '<div><div class="text-2xl font-bold">'+fmtNum(unitData.records.length)+
-        (cov&&cov.total&&!cov.complete?'<span class="text-sm font-normal text-white/40"> / '+fmtNum(cov.total)+'</span>':'')+
-        '</div><div class="text-[11px] text-white/50 mt-0.5">'+(cov&&cov.complete?'全期間公告':'已取得公告（未抓完）')+'</div></div>'+
-      '<div><div class="text-2xl font-bold">'+fmtNum(awards.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">決標紀錄（'+(unitPeriod?('近'+unitPeriod+'年'):'全期')+'）</div></div>'+
-      '<div><div class="text-2xl font-bold">'+fmtNum(tenders.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">招標公告（同期）</div></div>'+
-      '<div><div class="text-2xl font-bold">'+fmtNum(vs.length)+'</div><div class="text-[11px] text-white/50 mt-0.5">得標廠商家數</div></div>'+
+      '<div><div class="text-2xl font-bold text-ink-900">'+fmtNum(unitData.records.length)+
+        (cov&&cov.total&&!cov.complete?'<span class="text-sm font-normal text-slate-400"> / '+fmtNum(cov.total)+'</span>':'')+
+        '</div><div class="text-[11px] text-slate-500 mt-0.5">'+(cov&&cov.complete?'全期間公告':'已取得公告（未抓完）')+'</div></div>'+
+      '<div><div class="text-2xl font-bold text-ink-900">'+fmtNum(awards.length)+'</div><div class="text-[11px] text-slate-500 mt-0.5">決標紀錄（'+(unitPeriod?('近'+unitPeriod+'年'):'全期')+'）</div></div>'+
+      '<div><div class="text-2xl font-bold text-ink-900">'+fmtNum(tenders.length)+'</div><div class="text-[11px] text-slate-500 mt-0.5">招標公告（同期）</div></div>'+
+      '<div><div class="text-2xl font-bold text-ink-900">'+fmtNum(vs.length)+'</div><div class="text-[11px] text-slate-500 mt-0.5">得標廠商家數</div></div>'+
     '</div>'+
-    '<div class="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">'+
-      '<span class="text-white/50">已補齊決標金額合計</span><span class="text-lg font-bold text-jade-300">'+fmtWan(sum)+'</span>'+
-      '<span class="text-white/40">'+known.length+' / '+awards.length+' 案有金額'+(need?('，'+need+' 案未補'):'')+'</span>'+
-      (unitData.dropped?('<span class="text-white/40" title="抓分頁時官網又新增了公告，位移導致邊界紀錄被重抓，已濾掉">已濾除 '+fmtNum(unitData.dropped)+' 筆分頁重複</span>'):'')+
-      '<button onclick="listUnitRecords()" class="ml-auto px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs">在情報中心列出全部公告</button>'+
+    '<div class="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">'+
+      '<span class="text-slate-500">已補齊決標金額合計</span><span class="text-lg font-bold text-jade-700">'+fmtWan(sum)+'</span>'+
+      '<span class="text-slate-400">'+known.length+' / '+awards.length+' 案有金額'+(need?('，'+need+' 案未補'):'')+'</span>'+
+      (unitData.dropped?('<span class="text-slate-400" title="抓分頁時官網又新增了公告，位移導致邊界紀錄被重抓，已濾掉">已濾除 '+fmtNum(unitData.dropped)+' 筆分頁重複</span>'):'')+
+      '<button onclick="listUnitRecords()" class="ml-auto px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs">在情報中心列出全部公告</button>'+
     '</div>'+
   '</div>'+
 
   coverageBanner()+
-  preTenderBlock()+
-
+  agencySections([
+    ['agPre','前置公告', preTenderBlock()],
+    ['agVendors','得標廠商排行',
   '<div class="grid lg:grid-cols-3 gap-4">'+
     '<div class="lg:col-span-2 card p-5">'+
       '<div class="flex justify-between items-start flex-wrap gap-2">'+
-        '<div><div class="eyebrow">AGENCY VENDORS</div><h3 class="font-bold text-ink-900 mt-1">得標廠商排行</h3></div>'+
+        '<div><h3 class="font-bold text-ink-900">得標廠商排行</h3></div>'+
         '<div class="flex gap-1.5">'+pill(3,'3 年')+pill(5,'5 年')+pill(10,'10 年')+pill(0,'全部')+'</div>'+
       '</div>'+
       '<div class="flex flex-wrap gap-2 mt-3">'+
         '<input id="vendorQ" type="text" value="'+esc(unitVendorQ)+'" oninput="onVendorQ(this.value)" placeholder="搜尋此機關得標廠商…" class="flex-1 min-w-[180px] px-3 py-2 border rounded-xl text-sm">'+
-        '<button onclick="setUnitSort(\'count\')" class="px-3 py-2 text-xs rounded-lg '+(unitSort==='count'?'bg-ink-800 text-white':'border bg-white')+'">依件數</button>'+
-        '<button onclick="setUnitSort(\'amount\')" class="px-3 py-2 text-xs rounded-lg '+(unitSort==='amount'?'bg-ink-800 text-white':'border bg-white')+'">依金額</button>'+
+        '<button onclick="setUnitSort(\'count\')" class="px-3 py-2 text-xs rounded-lg '+(unitSort==='count'?'bg-jade-600 text-white':'border bg-white')+'">依件數</button>'+
+        '<button onclick="setUnitSort(\'amount\')" class="px-3 py-2 text-xs rounded-lg '+(unitSort==='amount'?'bg-jade-600 text-white':'border bg-white')+'">依金額</button>'+
       '</div>'+
       (need?('<div class="mt-3 flex items-center gap-2 flex-wrap text-xs bg-amber-50 border border-amber-100 rounded-xl p-3">'+
         '<i class="fa-solid fa-coins text-amber-600"></i><span class="text-amber-800">還有 <strong>'+need+'</strong> 案沒有決標金額（公告清單不含金額，要逐案抓）。</span>'+
@@ -3351,21 +3331,21 @@ function renderAgencyDetail(){
        :(awards.length?'<div class="mt-3 text-xs text-jade-700 bg-jade-50 border border-jade-100 rounded-xl p-3"><i class="fa-solid fa-circle-check mr-1"></i>本期間決標金額已全部補齊。</div>':''))+
       '<div id="fillProgress" class="hidden mt-3 text-xs bg-slate-50 border rounded-xl p-3"></div>'+
       '<div id="vendorRank" class="mt-3"></div>'+
-      '<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">金額為公告的「總決標金額」。複數決標／共同投標的案子，官方只公布一個總額，這裡會同時計入每一家得標廠商，看到 <span class="tag bg-slate-100 text-slate-600">共同</span> 標記代表該筆有重複計算風險。</p>'+
+      '<p class="hint text-[11px] text-slate-400 mt-3 leading-relaxed">金額為公告的「總決標金額」。複數決標／共同投標的案子，官方只公布一個總額，這裡會同時計入每一家得標廠商，看到 <span class="tag bg-slate-100 text-slate-600">共同</span> 標記代表該筆有重複計算風險。</p>'+
     '</div>'+
 
     '<div class="card p-5">'+
-      '<div class="eyebrow">PROFILE</div><h3 class="font-bold text-ink-900 mt-1">採購輪廓</h3>'+
+      '<h3 class="font-bold text-ink-900">採購輪廓</h3>'+
       '<div class="text-[11px] text-slate-400 mt-0.5">全期間收錄</div>'+
       distBlock('公告類型', tally(unitData.records, r=>recTy(r)||'未分類'), 7)+
       distBlock('年度公告量', yearTally(unitData.records), 10)+
     '</div>'+
-  '</div>'+
-
-  ratioBlock()+
-  flopBlock()+
-  debarredBlock()+
-  rhythmBlock();
+  '</div>'],
+    ['agRatio','落標率', ratioBlock()],
+    ['agFlop','流標機會', flopBlock()],
+    ['agDebar','拒絕往來', debarredBlock()],
+    ['agRhythm','發包節奏', rhythmBlock()]
+  ]);
 
   saveAgencySnapshot();
   renderVendorRank();
@@ -3497,9 +3477,9 @@ function ratioBlock(){
   const rows=bidRatios(per);
   const st=ratioStats(rows);
   let h='<div class="card p-5">'+
-    '<div class="eyebrow">BID RATIO</div>'+
-    '<h3 class="font-bold text-ink-900 mt-1">落標率（決標金額 ÷ 預算金額）</h3>'+
-    '<p class="text-xs text-slate-500 mt-1">判斷這個機關的案子要壓到幾折才會中。只能算<strong>同時有決標金額與預算金額</strong>的案子，所以樣本數很重要。</p>';
+    ''+
+    '<h3 class="font-bold text-ink-900">落標率（決標金額 ÷ 預算金額）</h3>'+
+    '<p class="hint text-xs text-slate-500 mt-1">判斷這個機關的案子要壓到幾折才會中。只能算<strong>同時有決標金額與預算金額</strong>的案子，所以樣本數很重要。</p>';
   if(!st){
     return h+'<div class="mt-4 flex items-center gap-2 flex-wrap text-xs bg-amber-50 border border-amber-100 rounded-xl p-3">'+
       '<i class="fa-solid fa-coins text-amber-600"></i>'+
@@ -3508,7 +3488,7 @@ function ratioBlock(){
   }
   const cov=awards.length? Math.round(st.n/awards.length*100) : 0;
   h+='<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">'+
-    '<div class="rounded-xl bg-ink-900 text-white p-3"><div class="text-xl font-bold">'+pct1(st.median)+'</div><div class="text-[11px] text-white/50 mt-0.5">落標率中位數</div></div>'+
+    '<div class="rounded-xl bg-jade-50 border border-jade-100 p-3"><div class="text-xl font-bold text-jade-700">'+pct1(st.median)+'</div><div class="text-[11px] text-slate-500 mt-0.5">落標率中位數</div></div>'+
     '<div class="rounded-xl bg-slate-50 border p-3"><div class="text-xl font-bold text-ink-900">'+fmtNum(st.n)+'</div><div class="text-[11px] text-slate-500 mt-0.5">樣本數（'+cov+'% 決標案）</div></div>'+
     '<div class="rounded-xl bg-slate-50 border p-3"><div class="text-xl font-bold text-ink-900">'+pct1(st.lowest[0].ratio)+'</div><div class="text-[11px] text-slate-500 mt-0.5">最低一案</div></div>'+
     '<div class="rounded-xl bg-slate-50 border p-3"><div class="text-xl font-bold text-ink-900">'+pct1(st.highest[0].ratio)+'</div><div class="text-[11px] text-slate-500 mt-0.5">最高一案</div></div>'+
@@ -3528,7 +3508,7 @@ function ratioBlock(){
        '<div class="text-[11px] text-slate-500 mt-0.5">'+fmtYmd(x.date)+' · 預算 '+fmtWan(x.budget)+' → 決標 '+fmtWan(x.award)+
        ' · <strong class="text-rose-600">'+pct1(x.ratio)+'</strong></div></div>').join('')+
      '</div></details>';
-  h+='<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">比值超過 3 倍或非正數的已剔除（多半是複數決標的總額對上單項預算）。'+
+  h+='<p class="hint text-[11px] text-slate-400 mt-3 leading-relaxed">比值超過 3 倍或非正數的已剔除（多半是複數決標的總額對上單項預算）。'+
      '樣本涵蓋率低的時候中位數會偏——它只代表<strong>你已經補齊金額的那些案子</strong>，而不是這個機關的全貌。'+
      '≥100% 的案子通常是決標金額含後續擴充或變更設計。</p>';
   return h+'</div>';
@@ -3690,9 +3670,9 @@ function preTenderBlock(){
   const needDetail=open.slice(0,PRE_DETAIL_MAX).filter(x=>!preDetail[preKey(x.job)]).length;
 
   let h='<div class="card p-5 border-l-4 border-sky-400">'+
-    '<div class="eyebrow">PRE-TENDER RADAR</div>'+
-    '<h3 class="font-bold text-ink-900 mt-1">前置公告雷達</h3>'+
-    '<p class="text-xs text-slate-500 mt-1 leading-relaxed">'+
+    ''+
+    '<h3 class="font-bold text-ink-900">前置公告雷達</h3>'+
+    '<p class="hint text-xs text-slate-500 mt-1 leading-relaxed">'+
       '<strong>招標公告是落後指標</strong>——公告出來時資格條款已經寫死。'+
       '真正的時間窗在它前面：<span class="tag bg-sky-100 text-sky-700">公開閱覽</span>是招標文件草案公開供閱覽，'+
       '<span class="tag bg-indigo-100 text-indigo-700">公開徵求</span>是 RFI、通常還在寫規範的階段。'+
@@ -3726,7 +3706,7 @@ function preTenderBlock(){
       '<div class="space-y-2 mt-2">'+done.slice(0,20).map(x=>preRow(x,st)).join('')+'</div>'+
       (done.length>20?('<p class="text-[11px] text-slate-400 mt-2">另有 '+(done.length-20)+' 案未顯示。</p>'):'')+'</details>';
   }
-  h+='<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">'+
+  h+='<p class="hint text-[11px] text-slate-400 mt-3 leading-relaxed">'+
     '「尚未招標」與推估區間都只反映<strong>已抓取的公告</strong>——機關沒抓完的話，招標公告可能已經出了只是還沒抓到。'+
     '資格條款是公告的<strong>摘要</strong>，完整條款在公開閱覽文件裡（公告有列閱覽地點與網址）。'+
     '實測有招標日早於前置公告日的反常資料，那種配對會標出來且不計入時間窗統計。</p>';
@@ -3890,9 +3870,9 @@ function flopBlock(){
   const needDetail=open.slice(0,FLOP_DETAIL_MAX).filter(function(x){ return !flopDetail[flopKey(x.job)]; }).length;
 
   let h='<div class="card p-5">'+
-    '<div class="eyebrow">FAILED TENDER RADAR</div>'+
-    '<h3 class="font-bold text-ink-900 mt-1">流標機會清單</h3>'+
-    '<p class="text-xs text-slate-500 mt-1 leading-relaxed">同一案號流標愈多次，機關愈可能<strong>拆包、放寬廠商資格或調高預算</strong>，這三件事都是切入點。'+
+    ''+
+    '<h3 class="font-bold text-ink-900">流標機會清單</h3>'+
+    '<p class="hint text-xs text-slate-500 mt-1 leading-relaxed">同一案號流標愈多次，機關愈可能<strong>拆包、放寬廠商資格或調高預算</strong>，這三件事都是切入點。'+
     '決標公告是落後指標，無法決標公告才是「機關卡住、正在想辦法」的訊號。</p>'+
     '<div class="flex flex-wrap gap-2 mt-3 text-[11px]">'+
       '<span class="tag bg-slate-100 text-slate-700">曾流標 '+rows.length+' 案</span>'+
@@ -3918,7 +3898,7 @@ function flopBlock(){
       '<div class="space-y-2 mt-2">'+done.slice(0,20).map(flopRow).join('')+'</div>'+
       (done.length>20?('<p class="text-[11px] text-slate-400 mt-2">另有 '+(done.length-20)+' 案未顯示。</p>'):'')+'</details>';
   }
-  h+='<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">序列只涵蓋<strong>已抓取的公告</strong>，機關沒抓完的話早年的流標看不到。'+
+  h+='<p class="hint text-[11px] text-slate-400 mt-3 leading-relaxed">序列只涵蓋<strong>已抓取的公告</strong>，機關沒抓完的話早年的流標看不到。'+
     '「尚未決標」是指最後一次流標之後還沒有決標公告——也可能是機關放棄了、改用其他案號重招，或決標公告還沒抓到。'+
     '一案多則流標公告（複數決標各品項一則）會被算成多次，看得到流標日相同就是這種情形。</p>';
   return h+'</div>';
@@ -3981,8 +3961,8 @@ function debarredBlock(){
   const alsoWon=[...names].filter(v=>winners[v]).map(v=>({name:v,count:winners[v]}))
                           .sort((a,b)=>b.count-a.count);
   let h='<div class="card p-5">'+
-    '<div class="eyebrow">DEBARRED VENDORS</div>'+
-    '<h3 class="font-bold text-ink-900 mt-1">拒絕往來廠商（停權名單）</h3>'+
+    ''+
+    '<h3 class="font-bold text-ink-900">拒絕往來廠商（停權名單）</h3>'+
     '<p class="text-xs text-slate-500 mt-1">這個機關公告過的廠商拒絕往來名單，共 <strong>'+list.length+'</strong> 則、涉及 <strong>'+names.size+'</strong> 家。查對手或潛在協力廠商有沒有被停權時可以看這裡。</p>';
   if(alsoWon.length){
     h+='<div class="mt-3 rounded-xl bg-rose-50 border border-rose-100 p-3">'+
@@ -4004,7 +3984,7 @@ function debarredBlock(){
       '</div></div>').join('')+
     '</div>'+
     (list.length>40?('<p class="text-[11px] text-slate-400 mt-2">另有 '+(list.length-40)+' 則未顯示。</p>'):'')+
-    '<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">同一案同一天可能有多則公告（一家廠商一則）。名單有「更正公告」代表原公告被修正過，'+
+    '<p class="hint text-[11px] text-slate-400 mt-3 leading-relaxed">同一案同一天可能有多則公告（一家廠商一則）。名單有「更正公告」代表原公告被修正過，'+
     '這裡不會自動抵銷——要確認廠商目前的停權狀態，請到工程會的政府電子採購網查「拒絕往來廠商」專區。</p>';
   return h+'</div>';
 }
@@ -4110,8 +4090,8 @@ function renderAgencyCompare(){
 
   let h='<details class="card p-0"'+((wasOpen||sel.length>=2)?' open':'')+'>'+
     '<summary class="p-4 cursor-pointer flex items-center justify-between flex-wrap gap-2">'+
-      '<div><div class="eyebrow">AGENCY COMPARE</div>'+
-      '<h3 class="font-bold text-ink-900 mt-1">機關對比</h3>'+
+      '<div>'+
+      '<h3 class="font-bold text-ink-900">機關對比</h3>'+
       '<p class="text-xs text-slate-500 mt-0.5">看過的機關會自動存一份指標快照，勾 2–4 個就能並排比。目前有 '+ids.length+' 個快照'+(sel.length?('，已勾 '+sel.length+' 個'):'')+'。</p></div>'+
       '<i class="fa-solid fa-chevron-down text-slate-300"></i>'+
     '</summary>'+
@@ -4171,7 +4151,7 @@ function renderAgencyCompare(){
     h+='</tr>';
   });
   h+='</tbody></table></div>'+
-    '<p class="text-[11px] text-slate-400 leading-relaxed">粗體標的是該列最高的一格：流標率、集中度這類「越高對新進者越不利」的用紅色，其餘用綠色。'+
+    '<p class="hint text-[11px] text-slate-400 leading-relaxed">粗體標的是該列最高的一格：流標率、集中度這類「越高對新進者越不利」的用紅色，其餘用綠色。'+
     '快照只存算好的數字、不存原始公告，所以不會佔太多空間，但也<strong>不會自動更新</strong>——機關有新公告要再點一次那個機關才會刷新。</p>';
   box.innerHTML=h+'</div></details>';
 }
@@ -4186,9 +4166,9 @@ function rhythmBlock(){
   const reLag=median(fails.filter(f=>f.lag!=null&&f.lag<1200).map(f=>f.lag));
 
   let h='<div class="card p-5">'+
-    '<div class="eyebrow">PROCUREMENT RHYTHM</div>'+
-    '<h3 class="font-bold text-ink-900 mt-1">發包節奏</h3>'+
-    '<p class="text-xs text-slate-500 mt-1">把年度性標案的名稱正規化成系列（去掉「115年度」這類年份），用歷年招標日的間隔中位數推下一次。全部由這份公告清單算出，沒有另外打 API。</p>'+
+    ''+
+    '<h3 class="font-bold text-ink-900">發包節奏</h3>'+
+    '<p class="hint text-xs text-slate-500 mt-1">把年度性標案的名稱正規化成系列（去掉「115年度」這類年份），用歷年招標日的間隔中位數推下一次。全部由這份公告清單算出，沒有另外打 API。</p>'+
     (function(){ const c=agencyCoverage();
       return (c&&!c.complete)
         ? '<p class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-2.5 mt-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>公告只抓到 '+fmtNum(c.got)+' 則（第 1–'+c.pf+' / '+c.tp+' 頁），而且是最近的那些。<strong>早年的招標紀錄還沒進來，所以系列的次數會偏低、間隔可能算錯。</strong>要當預測用請先把公告抓完。</p>'
@@ -4235,7 +4215,7 @@ function rhythmBlock(){
       '</tr>';
   });
   h+='</tbody></table></div>'+
-     '<p class="text-[11px] text-slate-400 mt-2 leading-relaxed">「間隔」是各輪招標日相差天數的中位數。距離上一次不到 '+MIN_ROUND_GAP+' 天的視為<strong>同一輪</strong>（流標重招、分批、第2次公告），不會被算成一個短週期。'+
+     '<p class="hint text-[11px] text-slate-400 mt-2 leading-relaxed">「間隔」是各輪招標日相差天數的中位數。距離上一次不到 '+MIN_ROUND_GAP+' 天的視為<strong>同一輪</strong>（流標重招、分批、第2次公告），不會被算成一個短週期。'+
      '間隔接近 365／730／1095 天才標為年度／兩年／三年，其餘標<strong>不規律</strong>並淡化——那些多半是偶發採購，預估值沒有意義。'+
      '次數只有 2 次的預估很脆弱，要一起看「慣例月份」的命中比例。過期未出現的系列可能已經停辦、改名或併案。</p></div>';
 
@@ -4254,7 +4234,7 @@ function rhythmBlock(){
           '</div>'+
         '</div></div>';
     });
-    h+='</div><p class="text-[11px] text-slate-400 mt-2 leading-relaxed">「尚未重招」是指這個標案系列在流標日之後還沒有出現新的招標公告——通常代表機關會再來一次，也常伴隨放寬資格或調整預算。名稱比對用的是正規化後的系列鍵，改名重招可能認不出來。</p></div>';
+    h+='</div><p class="hint text-[11px] text-slate-400 mt-2 leading-relaxed">「尚未重招」是指這個標案系列在流標日之後還沒有出現新的招標公告——通常代表機關會再來一次，也常伴隨放寬資格或調整預算。名稱比對用的是正規化後的系列鍵，改名重招可能認不出來。</p></div>';
   }
 
   return h+'</div>';
@@ -4661,13 +4641,14 @@ function toggleVsnapSel(name,on){
 function renderRivals(){
   const box=document.getElementById('rivalPanel'); if(!box) return;
   let h='<div class="card p-5">'+
-    '<div class="eyebrow">RIVAL WATCH</div>'+
-    '<h3 class="font-bold text-ink-900 mt-1">對手常駐追蹤</h3>'+
-    '<p class="text-xs text-slate-500 mt-1">建一份對手清單，一鍵看它們得標什麼、在哪些機關、跟誰一起得標、跟誰同場競標。</p>'+
+    ''+
+    '<h3 class="font-bold text-ink-900">對手常駐追蹤</h3>'+
+    '<p class="hint text-xs text-slate-500 mt-1">建一份對手清單，一鍵看它們得標什麼、在哪些機關、跟誰一起得標、跟誰同場競標。</p>'+
     '<div class="mt-2.5 flex flex-wrap items-center gap-2 text-xs bg-slate-50 border rounded-xl p-2.5">'+
       '<i class="fa-solid fa-layer-group text-slate-400"></i><span class="text-slate-600">抓取深度</span>'+
-      VPAGE_CHOICES.map(([v,label])=>'<button onclick="setVendorPages('+v+')" class="px-2.5 py-1 rounded-lg '+
-        ((parseInt(vendorPages,10)||0)===v?'bg-ink-800 text-white font-semibold':'bg-white border hover:bg-slate-50')+'">'+label+'</button>').join('')+
+      VPAGE_CHOICES.map(([v,label])=>{ const on=(parseInt(vendorPages,10)||0)===v;   // aria-pressed 也給畫面測試認，不靠顏色 class
+        return '<button onclick="setVendorPages('+v+')" aria-pressed="'+on+'" class="px-2.5 py-1 rounded-lg '+
+        (on?'bg-jade-600 text-white font-semibold':'bg-white border hover:bg-slate-50')+'">'+label+'</button>'; }).join('')+
       '<span class="text-[11px] text-slate-400">每頁 '+RIVAL_PER_PAGE+' 筆'+
         ((parseInt(vendorPages,10)||0)>0
           ? ('，最多 '+fmtNum(rivalLimit()*RIVAL_PER_PAGE)+' 筆／家，約 '+rivalEta(rivalLimit())+' 秒')
@@ -4780,8 +4761,8 @@ function renderVendorCompare(){
 
   let h='<details class="card p-0"'+((wasOpen||sel.length>=2)?' open':'')+'>'+
     '<summary class="p-4 cursor-pointer flex items-center justify-between flex-wrap gap-2">'+
-      '<div><div class="eyebrow">VENDOR COMPARE</div>'+
-      '<h3 class="font-bold text-ink-900 mt-1">廠商對比</h3>'+
+      '<div>'+
+      '<h3 class="font-bold text-ink-900">廠商對比</h3>'+
       '<p class="text-xs text-slate-500 mt-0.5">勾 2–4 家並排比。目前有 '+names.length+' 份廠商快照'+(sel.length?('，已勾 '+sel.length+' 家'):'')+'。</p></div>'+
       '<i class="fa-solid fa-chevron-down text-slate-300"></i>'+
     '</summary><div class="border-t p-4 space-y-4">'+
@@ -5053,7 +5034,7 @@ function renderCompare(){
     ((!cmpView.custom&&cmpView.preset===k)?'bg-jade-600 text-white font-semibold':'bg-white border hover:bg-slate-50')+'">'+l+'</button>';
   let t='<div class="card p-4 mb-4 space-y-3">'+
     '<div class="flex items-center justify-between flex-wrap gap-2">'+
-      '<div><div class="eyebrow">COMPARE</div><h3 class="font-bold text-ink-900 mt-1">'+compareList.length+' 案並排 · '+built.length+' 個欄位，其中 '+diffCount+' 個有差異</h3></div>'+
+      '<div><h3 class="font-bold text-ink-900">'+compareList.length+' 案並排 · '+built.length+' 個欄位，其中 '+diffCount+' 個有差異</h3></div>'+
       '<div class="flex gap-2 flex-wrap">'+
         '<button onclick="exportCompareCsv()" class="px-3 py-1.5 text-xs border rounded-lg hover:bg-slate-50"><i class="fa-solid fa-file-csv mr-1"></i>匯出 CSV</button>'+
         '<button onclick="clearCompare()" class="px-3 py-1.5 text-xs border rounded-lg hover:bg-rose-50 text-rose-600">全部清空</button>'+
@@ -5108,7 +5089,7 @@ function renderCompare(){
     h+='</tr>';
   });
   h+='</tbody></table>'+
-     '<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">淡黃底、標 <i class="fa-solid fa-not-equal text-amber-500"></i> 的列代表各案值不同，是實際要比的地方；全部相同的列已淡化。「決標金額」與「決標／預算比」來自本機的決標金額快取，沒補齊的案子會是空的——到機關洞察按「補齊決標金額」。</p>';
+     '<p class="hint text-[11px] text-slate-400 mt-3 leading-relaxed">淡黃底、標 <i class="fa-solid fa-not-equal text-amber-500"></i> 的列代表各案值不同，是實際要比的地方；全部相同的列已淡化。「決標金額」與「決標／預算比」來自本機的決標金額快取，沒補齊的案子會是空的——到機關洞察按「補齊決標金額」。</p>';
   box.innerHTML=h;
 }
 
@@ -5168,7 +5149,7 @@ function renderStorageMeter(){
     '</div>'+
     '<div class="h-1.5 bg-slate-200 rounded-full overflow-hidden flex">'+
       '<div class="h-full '+tone+'" style="width:'+pctCache+'%"></div>'+
-      '<div class="h-full bg-ink-800" style="width:'+Math.min(100-pctCache,Math.round(u.user/LIMIT*100))+'%"></div>'+
+      '<div class="h-full bg-slate-400" style="width:'+Math.min(100-pctCache,Math.round(u.user/LIMIT*100))+'%"></div>'+
     '</div>'+
     (pctAll>=70?('<p class="text-[10px] text-amber-600 mt-1">快接近瀏覽器上限（通常約 5 MB）。按「只清快取」可以釋出 '+mb(u.cache)+' MB，你的追蹤與比較不會動到。</p>'):'');
 }
@@ -5228,6 +5209,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('agencyFilter').addEventListener('keydown',e=>{ if(e.key==='Enter') renderAgencies(); });
   document.getElementById('rivalPanel').addEventListener('keydown',e=>{
     if(e.key==='Enter' && e.target && e.target.id==='rivalInput') addRival(); });
+  applyHints(LS.get(HINT_KEY,false));
   renderWatchChips(); checkProxy(false);
   updateCounters(); renderOverview(); renderStorageMeter();
 });

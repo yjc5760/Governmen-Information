@@ -233,13 +233,14 @@ function toggleVsnapSel(name,on){
 function renderRivals(){
   const box=document.getElementById('rivalPanel'); if(!box) return;
   let h='<div class="card p-5">'+
-    '<div class="eyebrow">RIVAL WATCH</div>'+
-    '<h3 class="font-bold text-ink-900 mt-1">對手常駐追蹤</h3>'+
-    '<p class="text-xs text-slate-500 mt-1">建一份對手清單，一鍵看它們得標什麼、在哪些機關、跟誰一起得標、跟誰同場競標。</p>'+
+    ''+
+    '<h3 class="font-bold text-ink-900">對手常駐追蹤</h3>'+
+    '<p class="hint text-xs text-slate-500 mt-1">建一份對手清單，一鍵看它們得標什麼、在哪些機關、跟誰一起得標、跟誰同場競標。</p>'+
     '<div class="mt-2.5 flex flex-wrap items-center gap-2 text-xs bg-slate-50 border rounded-xl p-2.5">'+
       '<i class="fa-solid fa-layer-group text-slate-400"></i><span class="text-slate-600">抓取深度</span>'+
-      VPAGE_CHOICES.map(([v,label])=>'<button onclick="setVendorPages('+v+')" class="px-2.5 py-1 rounded-lg '+
-        ((parseInt(vendorPages,10)||0)===v?'bg-ink-800 text-white font-semibold':'bg-white border hover:bg-slate-50')+'">'+label+'</button>').join('')+
+      VPAGE_CHOICES.map(([v,label])=>{ const on=(parseInt(vendorPages,10)||0)===v;   // aria-pressed 也給畫面測試認，不靠顏色 class
+        return '<button onclick="setVendorPages('+v+')" aria-pressed="'+on+'" class="px-2.5 py-1 rounded-lg '+
+        (on?'bg-jade-600 text-white font-semibold':'bg-white border hover:bg-slate-50')+'">'+label+'</button>'; }).join('')+
       '<span class="text-[11px] text-slate-400">每頁 '+RIVAL_PER_PAGE+' 筆'+
         ((parseInt(vendorPages,10)||0)>0
           ? ('，最多 '+fmtNum(rivalLimit()*RIVAL_PER_PAGE)+' 筆／家，約 '+rivalEta(rivalLimit())+' 秒')
@@ -352,8 +353,8 @@ function renderVendorCompare(){
 
   let h='<details class="card p-0"'+((wasOpen||sel.length>=2)?' open':'')+'>'+
     '<summary class="p-4 cursor-pointer flex items-center justify-between flex-wrap gap-2">'+
-      '<div><div class="eyebrow">VENDOR COMPARE</div>'+
-      '<h3 class="font-bold text-ink-900 mt-1">廠商對比</h3>'+
+      '<div>'+
+      '<h3 class="font-bold text-ink-900">廠商對比</h3>'+
       '<p class="text-xs text-slate-500 mt-0.5">勾 2–4 家並排比。目前有 '+names.length+' 份廠商快照'+(sel.length?('，已勾 '+sel.length+' 家'):'')+'。</p></div>'+
       '<i class="fa-solid fa-chevron-down text-slate-300"></i>'+
     '</summary><div class="border-t p-4 space-y-4">'+

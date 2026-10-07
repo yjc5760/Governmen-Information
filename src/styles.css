@@ -5,14 +5,29 @@
 @tailwind base;
 @tailwind components;
 
-body { background:#EDF2F1; }
+body { background:#F6F8F7; }                       /* 淺色底，與 tailwind 的 paper 同色 */
 ::-webkit-scrollbar { width:6px; height:6px; }
-::-webkit-scrollbar-thumb { background:#c3d3cf; border-radius:4px; }
-.eyebrow { letter-spacing:.14em; font-size:11px; font-weight:700; color:#0F7168; }
-.card { background:#fff; border-radius:14px; box-shadow:0 1px 2px rgba(16,63,59,.06); }
+::-webkit-scrollbar-thumb { background:#cfd9d6; border-radius:4px; }
+.eyebrow { font-size:12px; font-weight:600; color:#0F7168; }
+.card { background:#fff; border:1px solid #E3EAE8; border-radius:12px; }
 .tag { display:inline-block; padding:3px 12px; border-radius:999px; font-size:11px; font-weight:600; }
-.navitem { display:flex; align-items:center; gap:.75rem; padding:.6rem .9rem; border-radius:10px; font-size:.9rem; color:#cfe0dc; cursor:pointer; }
-.navitem:hover { background:rgba(255,255,255,.06); }
-.navitem.active { background:rgba(21,145,131,.18); color:#fff; font-weight:600; box-shadow:inset 3px 0 0 #159183; }
+
+/* 頁首的橫向分頁 */
+.navitem { display:flex; align-items:center; gap:.45rem; padding:.65rem .85rem; font-size:.875rem; color:#475569;
+           border-bottom:2px solid transparent; white-space:nowrap; cursor:pointer; flex-shrink:0; }
+.navitem i { color:#94a3b8; font-size:.8rem; }
+.navitem:hover { color:#0B5F55; background:#F3F7F6; }
+.navitem.active { color:#0B5F55; border-bottom-color:#0F7168; font-weight:600; }
+.navitem.active i { color:#0F7168; }
+#navTrackCount:empty, #navCompareCount:empty { display:none; }
+#tabBar { scrollbar-width:none; }
+#tabBar::-webkit-scrollbar { display:none; }
+@media (max-width: 1023px) {                       /* 手機分頁列右緣淡出，提示還能往右滑 */
+  #tabBar { padding-right:28px; -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent); mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent); }
+}
+
+/* 說明文字預設收起，按頁首「說明」才顯示 */
+.hint { display:none; }
+body.show-hints .hint { display:block; }
 
 @tailwind utilities;

@@ -49,7 +49,7 @@ function renderAgencies(){
       '<p class="text-sm text-slate-500">還沒有認識任何機關。</p>'+
       '<p class="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">標案 API 沒有「用機關名稱查機關」的端點，機關只能從抓下來的公告裡認識。先同步幾天公告，或到標案情報中心查一筆標案、按「機關採購輪廓」進來。</p>'+
       '<div class="flex gap-2 justify-center flex-wrap pt-1">'+
-      '<button onclick="syncFromAgencies()" class="px-4 py-2 bg-ink-800 hover:bg-ink-900 text-white rounded-lg text-xs font-medium">同步近 7 日公告</button>'+
+      '<button onclick="syncFromAgencies()" class="px-4 py-2 bg-jade-600 hover:bg-jade-700 text-white rounded-lg text-xs font-medium">同步近 7 日公告</button>'+
       '<button onclick="go(\'tenders\')" class="px-4 py-2 border rounded-lg text-xs hover:bg-slate-50">去標案情報中心</button>'+
       '</div></div>';
     return;

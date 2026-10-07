@@ -13,7 +13,7 @@ async function checkProxy(loud){
   try{ await proxyGet('/api/health'); proxyOk=true; if(loud) toast('proxy 連線正常','success'); }
   catch(e){ proxyOk=false; if(loud) toast('proxy 沒有回應：'+e.message,'error'); }
   const dot=document.getElementById('navLiveDot');
-  if(dot) dot.className='ml-auto w-2 h-2 rounded-full '+(proxyOk?'bg-emerald-400':'bg-slate-500');
+  if(dot) dot.className='w-2 h-2 rounded-full '+(proxyOk?'bg-emerald-400':'bg-slate-500');
   document.getElementById('proxyOffline').classList.toggle('hidden',proxyOk);
   return proxyOk;
 }
@@ -121,7 +121,7 @@ async function runWatch(){
     meta.textContent='共 '+r.count+' 件等標期內案件，其中 '+r.closingSoon.length+' 件 14 日內截止'+
       (r.errors&&r.errors.length?('；'+r.errors.length+' 組關鍵字失敗'):'');
     if(r.closingSoon.length){
-      closing.innerHTML='<div class="eyebrow px-1">CLOSING SOON — 14 日內截止</div>';
+      closing.innerHTML='<div class="eyebrow px-1">14 日內截止</div>';
       r.closingSoon.forEach(x=>closing.appendChild(liveCard(x)));
     }
     const rest=r.records.filter(x=>!r.closingSoon.some(c=>c.caseId===x.caseId));

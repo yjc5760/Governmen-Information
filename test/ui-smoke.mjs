@@ -295,7 +295,7 @@ assert.ok(cards[1].includes('廠商丙公司') && !cards[1].includes('得標丙�
   assert.ok(body.includes('抓取深度'), '對手追蹤要有抓取深度設定');
   assert.ok(body.includes('抓到底'), '要提供「抓到底」選項');
   const depthBtns = await page.$$eval('#rivalPanel button[onclick*="setVendorPages"]',
-    bs => bs.map(b => ({ t: b.textContent, on: b.className.indexOf('bg-ink-800') >= 0 })));
+    bs => bs.map(b => ({ t: b.textContent, on: b.getAttribute('aria-pressed') === 'true' })));   // 認語意不認顏色：改配色不該弄壞測試
   assert.equal(depthBtns.length, 4, '應有 4 個深度選項，實際 ' + depthBtns.length);
   assert.equal(depthBtns.filter(b => b.on).length, 1, '只能有一個選中');
   assert.equal(depthBtns.find(b => b.on).t, '3 頁', '目前應選中 3 頁');

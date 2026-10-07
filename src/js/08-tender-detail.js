@@ -126,13 +126,13 @@ function renderTenderBody(){
   let html='<div class="flex flex-wrap gap-1.5">'+typeTag(t.type)+(t.date?'<span class="tag bg-slate-100 text-slate-600">'+esc(t.date)+'</span>':'')+
     (t.records.length>1?'<span class="tag bg-amber-100 text-amber-800">'+t.records.length+' 次公告紀錄</span>':'')+'</div>';
 
-  html+='<div class="rounded-2xl bg-ink-900 text-white p-5 space-y-4">'+
-    '<div class="eyebrow text-jade-500/90">投標關鍵資訊</div>'+
-    '<div><div class="text-xs text-white/60"><i class="fa-regular fa-calendar mr-1.5"></i>投標截止</div>'+
-    '<div class="text-xl font-bold mt-1">'+(t.deadline?esc(t.deadline):'—')+
-    (left!=null&&left>=0?' <span class="text-sm font-normal text-jade-300">（剩 '+left+' 天）</span>':(left!=null?' <span class="text-sm font-normal text-white/40">（已截止）</span>':''))+'</div></div>'+
-    '<div class="border-t border-white/10 pt-3"><div class="text-xs text-white/60"><i class="fa-solid fa-dollar-sign mr-1.5"></i>採購預算</div>'+
-    '<div class="text-xl font-bold mt-1">'+(parseMoney(t.budget)?('$'+fmtNum(parseMoney(t.budget))):(esc(t.budget)||'未公開'))+'</div></div>'+
+  html+='<div class="rounded-2xl bg-jade-50 border border-jade-100 p-5 space-y-4">'+
+    '<div class="eyebrow">投標關鍵資訊</div>'+
+    '<div><div class="text-xs text-slate-500"><i class="fa-regular fa-calendar mr-1.5"></i>投標截止</div>'+
+    '<div class="text-xl font-bold text-ink-900">'+(t.deadline?esc(t.deadline):'—')+
+    (left!=null&&left>=0?' <span class="text-sm font-normal text-jade-700">（剩 '+left+' 天）</span>':(left!=null?' <span class="text-sm font-normal text-slate-400">（已截止）</span>':''))+'</div></div>'+
+    '<div class="border-t border-jade-100 pt-3"><div class="text-xs text-slate-500"><i class="fa-solid fa-dollar-sign mr-1.5"></i>採購預算</div>'+
+    '<div class="text-xl font-bold text-ink-900">'+(parseMoney(t.budget)?('$'+fmtNum(parseMoney(t.budget))):(esc(t.budget)||'未公開'))+'</div></div>'+
     '</div>';
 
   html+=gateBlock(d);

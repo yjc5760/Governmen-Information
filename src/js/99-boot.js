@@ -9,6 +9,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('agencyFilter').addEventListener('keydown',e=>{ if(e.key==='Enter') renderAgencies(); });
   document.getElementById('rivalPanel').addEventListener('keydown',e=>{
     if(e.key==='Enter' && e.target && e.target.id==='rivalInput') addRival(); });
+  applyHints(LS.get(HINT_KEY,false));
   renderWatchChips(); checkProxy(false);
   updateCounters(); renderOverview(); renderStorageMeter();
 });

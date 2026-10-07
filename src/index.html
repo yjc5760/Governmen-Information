@@ -31,7 +31,7 @@
       <div>
         <label class="block text-xs font-semibold text-slate-600 mb-1">API Token</label>
         <input type="text" id="apiTokenInput" placeholder="ofk_..." class="w-full text-sm px-3 py-2 border rounded-lg font-mono text-[11px]">
-        <p class="text-[11px] text-slate-400 mt-1">預設帶入官方 pcc-viewer 公開設定檔裡的 token。若被限流，換成自己申請的。</p>
+        <p class="hint text-[11px] text-slate-400 mt-1">預設帶入官方 pcc-viewer 公開設定檔裡的 token。若被限流，換成自己申請的。</p>
       </div>
       <button onclick="testApi()" class="px-3 py-2 text-xs border rounded-lg hover:bg-slate-50"><i class="fa-solid fa-plug mr-1"></i>測試 API</button>
     </div>
@@ -41,7 +41,7 @@
       <div>
         <label class="block text-xs font-semibold text-slate-600 mb-1">本機 proxy 位址</label>
         <input type="text" id="proxyBaseInput" placeholder="http://localhost:5178" class="w-full text-sm px-3 py-2 border rounded-lg font-mono text-[11px]">
-        <p class="text-[11px] text-slate-400 mt-1">需要在電腦上跑 proxy／server.js。沒跑的話，「官網即時查」那頁不會有資料，其他頁不受影響。</p>
+        <p class="hint text-[11px] text-slate-400 mt-1">需要在電腦上跑 proxy／server.js。沒跑的話，「官網即時查」那頁不會有資料，其他頁不受影響。</p>
       </div>
       <button onclick="testProxy()" class="px-3 py-2 text-xs border rounded-lg hover:bg-slate-50"><i class="fa-solid fa-plug mr-1"></i>測試 proxy</button>
     </div>
@@ -78,7 +78,7 @@
   <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[88vh] flex flex-col">
     <div class="flex justify-between items-start gap-3 p-5 border-b">
       <div class="min-w-0">
-        <div class="eyebrow">AGENCY AWARD CASES</div>
+        
         <h3 id="vmTitle" class="text-base font-bold text-ink-900 mt-1 leading-snug"></h3>
       </div>
       <button onclick="modal('vendorModal',false)" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-xl"></i></button>
@@ -89,52 +89,33 @@
   </div>
 </div>
 
-<!-- ===== 側欄 ===== -->
-<div id="drawerBackdrop" onclick="closeDrawer()" class="fixed inset-0 bg-black/40 z-40 hidden lg:hidden"></div>
-<aside id="drawer" class="fixed top-0 left-0 h-full w-72 bg-ink-900 z-50 p-4 flex flex-col gap-1 -translate-x-full lg:translate-x-0 transition-transform duration-200">
-  <div class="flex items-center justify-between mb-4 px-1">
-    <div class="flex items-center gap-2.5">
-      <div class="w-9 h-9 rounded-xl bg-jade-600 flex items-center justify-center text-white"><i class="fa-solid fa-bullseye"></i></div>
-      <span class="text-white font-bold">標案參謀室</span>
-    </div>
-    <button onclick="closeDrawer()" class="lg:hidden text-white/60 hover:text-white p-2"><i class="fa-solid fa-xmark"></i></button>
-  </div>
-
-  <div class="px-3 py-2.5 rounded-xl bg-white/5 flex items-center gap-2.5 mb-2">
-    <div class="w-8 h-8 rounded-full bg-jade-600 text-white text-xs flex items-center justify-center font-bold">公</div>
-    <span class="text-sm text-white/90">公開資料瀏覽</span>
-  </div>
-  <div class="navitem active" data-page="overview"><i class="fa-solid fa-table-cells-large w-4"></i>總覽</div>
-  <div class="navitem" data-page="tenders"><i class="fa-solid fa-file-magnifying-glass w-4"></i>標案情報中心</div>
-  <div class="navitem" data-page="live"><i class="fa-solid fa-tower-broadcast w-4"></i>官網即時查 <span id="navLiveDot" class="ml-auto w-2 h-2 rounded-full bg-slate-500"></span></div>
-  <div class="navitem" data-page="agencies"><i class="fa-solid fa-building-columns w-4"></i>機關洞察</div>
-  <div class="navitem" data-page="market"><i class="fa-solid fa-code-compare w-4"></i>市場與廠商</div>
-  <div class="navitem" data-page="calendar"><i class="fa-regular fa-calendar w-4"></i>採購行事曆</div>
-
-  <div class="px-3 py-2.5 rounded-xl bg-white/5 flex items-center gap-2.5 mt-4 mb-2">
-    <div class="w-8 h-8 rounded-full bg-ink-700 text-white text-xs flex items-center justify-center font-bold">我</div>
-    <span class="text-sm text-white/90">我的工作區</span>
-  </div>
-  <div class="navitem" data-page="tracked"><i class="fa-regular fa-bookmark w-4"></i>追蹤清單 <span id="navTrackCount" class="ml-auto text-[11px] bg-jade-600 text-white px-1.5 rounded"></span></div>
-  <div class="navitem" data-page="compare"><i class="fa-solid fa-scale-balanced w-4"></i>標案比較 <span id="navCompareCount" class="ml-auto text-[11px] bg-jade-600 text-white px-1.5 rounded"></span></div>
-
-  <div class="mt-auto space-y-2">
-    <div id="apiStatus" class="text-[11px] text-white/50 px-3 py-2 rounded-lg bg-white/5">資料來源：g0v 標案 API</div>
-    <button onclick="modal('settingsModal',true)" class="w-full text-left navitem"><i class="fa-solid fa-gear w-4"></i>設定</button>
-  </div>
-</aside>
-
-<!-- ===== 主體 ===== -->
-<div class="lg:pl-72">
-  <header class="sticky top-0 z-30 bg-white border-b border-slate-200">
-    <div class="h-16 px-4 sm:px-6 flex items-center justify-between gap-3">
-      <div class="flex items-center gap-3 min-w-0">
-        <button onclick="openDrawer()" class="lg:hidden w-10 h-10 border rounded-xl flex items-center justify-center"><i class="fa-solid fa-bars"></i></button>
-        <h1 id="pageTitle" class="text-lg font-bold text-ink-900 truncate">總覽</h1>
+<!-- ===== 頁首與分頁（淺色、橫向） ===== -->
+<div>
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6">
+      <div class="h-14 flex items-center gap-3">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-jade-50 text-jade-700 flex items-center justify-center"><i class="fa-solid fa-bullseye"></i></div>
+          <span class="font-bold text-ink-900 whitespace-nowrap">標案參謀室</span>
+        </div>
+        <h1 id="pageTitle" class="sr-only">總覽</h1>
+        <div class="ml-auto flex items-center gap-2 min-w-0">
+          <span id="apiStatus" class="hidden md:inline text-[11px] text-slate-400 truncate max-w-[260px]">資料來源：g0v 標案 API</span>
+          <button id="hintToggle" onclick="toggleHints()" title="顯示或收起各區塊的詳細說明" class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-slate-50 whitespace-nowrap"><i class="fa-regular fa-circle-question mr-1"></i>說明</button>
+          <button onclick="modal('settingsModal',true)" title="設定" class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-slate-50 whitespace-nowrap"><i class="fa-solid fa-gear"></i><span class="hidden sm:inline ml-1">設定</span></button>
+        </div>
       </div>
-      <button onclick="modal('settingsModal',true)" class="px-3.5 py-2 rounded-xl bg-jade-600 hover:bg-jade-700 text-white text-sm font-semibold flex items-center gap-2">
-        <i class="fa-solid fa-gear"></i><span class="hidden sm:inline">設定</span>
-      </button>
+      <nav id="tabBar" class="flex items-end gap-0.5 overflow-x-auto -mb-px" aria-label="頁面">
+        <div class="navitem active" data-page="overview"><i class="fa-solid fa-table-cells-large"></i>總覽</div>
+        <div class="navitem" data-page="tenders"><i class="fa-solid fa-magnifying-glass"></i>標案情報中心</div>
+        <div class="navitem" data-page="live"><i class="fa-solid fa-tower-broadcast"></i>官網即時查<span id="navLiveDot" class="w-2 h-2 rounded-full bg-slate-500"></span></div>
+        <div class="navitem" data-page="agencies"><i class="fa-solid fa-building-columns"></i>機關洞察</div>
+        <div class="navitem" data-page="market"><i class="fa-solid fa-code-compare"></i>市場與廠商</div>
+        <div class="navitem" data-page="calendar"><i class="fa-regular fa-calendar"></i>採購行事曆</div>
+        <span class="self-center w-px h-5 bg-slate-200 mx-2 flex-shrink-0"></span>
+        <div class="navitem" data-page="tracked"><i class="fa-regular fa-bookmark"></i>追蹤清單<span id="navTrackCount" class="text-[11px] bg-jade-600 text-white px-1.5 rounded"></span></div>
+        <div class="navitem" data-page="compare"><i class="fa-solid fa-scale-balanced"></i>標案比較<span id="navCompareCount" class="text-[11px] bg-jade-600 text-white px-1.5 rounded"></span></div>
+      </nav>
     </div>
   </header>
 
@@ -142,9 +123,9 @@
 
     <!-- ===== 總覽 ===== -->
     <section data-view="overview">
-      <div class="card p-5 border-l-4 border-jade-600 mb-5">
-        <div class="eyebrow">PUBLIC TENDER INTELLIGENCE</div>
-        <h2 class="text-2xl font-bold text-ink-900 mt-1.5 leading-snug">公開標案情報，免登入直接查</h2>
+      <div class="card p-5 mb-5">
+        
+        <h2 class="text-xl font-bold text-ink-900 leading-snug">公開標案情報，免登入直接查</h2>
         <button onclick="go('tenders')" class="mt-4 w-full py-3 rounded-xl bg-jade-600 hover:bg-jade-700 text-white font-semibold flex items-center justify-center gap-2">
           <i class="fa-solid fa-magnifying-glass"></i> 搜尋政府採購商機
         </button>
@@ -168,15 +149,15 @@
       <div class="card p-5 mb-5">
         <div class="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <div class="eyebrow">SYNC</div>
-            <h3 class="font-bold text-ink-900 mt-1">同步近期公告</h3>
-            <p class="text-xs text-slate-500 mt-1">逐日抓取全國公告存進瀏覽器，機關洞察與行事曆都靠這份快取。</p>
+            
+            <h3 class="font-bold text-ink-900">同步近期公告</h3>
+            <p class="hint text-xs text-slate-500 mt-1">逐日抓取全國公告存進瀏覽器，機關洞察與行事曆都靠這份快取。</p>
           </div>
           <div class="flex items-center gap-2">
             <select id="syncDays" class="text-sm p-2 border rounded-lg bg-white">
               <option value="3">近 3 日</option><option value="7" selected>近 7 日</option><option value="14">近 14 日</option>
             </select>
-            <button onclick="syncDays()" id="syncBtn" class="px-4 py-2 bg-ink-800 hover:bg-ink-900 text-white rounded-lg text-sm font-medium">開始同步</button>
+            <button onclick="syncDays()" id="syncBtn" class="px-4 py-2 bg-jade-600 hover:bg-jade-700 text-white rounded-lg text-sm font-medium">開始同步</button>
           </div>
         </div>
         <div id="syncProgress" class="hidden mt-3 text-xs text-jade-700 bg-jade-50 border border-jade-100 rounded-lg p-3"></div>
@@ -185,7 +166,7 @@
 
       <div class="card p-5">
         <div class="flex items-center justify-between">
-          <div><div class="eyebrow">DEADLINES</div><h3 class="font-bold text-ink-900 mt-1">追蹤中近期截止</h3></div>
+          <div><h3 class="font-bold text-ink-900">追蹤中近期截止</h3></div>
           <button onclick="go('tracked')" class="text-jade-600 text-sm font-semibold">查看全部 ›</button>
         </div>
         <div id="overviewDeadlines" class="mt-4 divide-y divide-slate-100"></div>
@@ -195,7 +176,7 @@
     <!-- ===== 標案情報中心 ===== -->
     <section data-view="tenders" hidden>
       <div class="card p-5 mb-4">
-        <div class="eyebrow">SEARCH</div>
+        
         <div class="mt-3 space-y-2">
           <div>
             <label for="searchQuery" class="block text-[11px] font-semibold text-slate-600 mb-1">標案名稱</label>
@@ -219,7 +200,7 @@
                      class="w-full px-3 py-2.5 border rounded-xl text-sm font-mono focus:ring-2 focus:ring-jade-500 focus:outline-none">
             </div>
           </div>
-          <p class="text-[11px] text-slate-400 leading-relaxed">四個欄位是 <strong>AND</strong>——填幾個就要同時成立。標案 API 一次只能用一個條件查，而且<strong>沒有機關查詢端點</strong>，所以程式會挑選擇性最高的當主查詢（機關索引唯一命中 › 統一編號 › 廠商名稱 › 標案名稱），其餘在前端篩。畫面上會標明主查詢是哪個、掃了多少筆，別把部分結果當成全部。</p>
+          <p class="hint text-[11px] text-slate-400 leading-relaxed">四個欄位是 <strong>AND</strong>——填幾個就要同時成立。標案 API 一次只能用一個條件查，而且<strong>沒有機關查詢端點</strong>，所以程式會挑選擇性最高的當主查詢（機關索引唯一命中 › 統一編號 › 廠商名稱 › 標案名稱），其餘在前端篩。畫面上會標明主查詢是哪個、掃了多少筆，別把部分結果當成全部。</p>
           <div class="flex gap-2">
             <button onclick="doSearch(1)" class="flex-1 py-2.5 rounded-xl bg-jade-600 hover:bg-jade-700 text-white font-semibold text-sm"><i class="fa-solid fa-magnifying-glass mr-1"></i>搜尋</button>
             <button onclick="clearSearchConds()" class="px-4 py-2.5 border rounded-xl text-xs hover:bg-slate-50 whitespace-nowrap">清空條件</button>
@@ -244,9 +225,9 @@
       </div>
 
       <div class="card p-5 mb-4">
-        <div class="eyebrow">LIVE SEARCH</div>
-        <h3 class="font-bold text-ink-900 mt-1">等標期內即時查詢</h3>
-        <p class="text-xs text-slate-500 mt-1">直接查政府電子採購網，只回傳尚未截止的案子，清單就帶截止日與預算。</p>
+        
+        <h3 class="font-bold text-ink-900">等標期內即時查詢</h3>
+        <p class="hint text-xs text-slate-500 mt-1">直接查政府電子採購網，只回傳尚未截止的案子，清單就帶截止日與預算。</p>
         <div class="mt-3 space-y-2">
           <input id="liveKeyword" type="text" placeholder="關鍵字，例如：燃氣、統包、監造" class="w-full px-4 py-3 border rounded-xl text-sm focus:ring-2 focus:ring-jade-500 focus:outline-none">
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -278,11 +259,11 @@
       <div class="card p-5 mb-4">
         <div class="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <div class="eyebrow">WATCHLIST</div>
-            <h3 class="font-bold text-ink-900 mt-1">關鍵字監看</h3>
-            <p class="text-xs text-slate-500 mt-1">存一組固定關鍵字，一次跑完並依截止日排序。</p>
+            
+            <h3 class="font-bold text-ink-900">關鍵字監看</h3>
+            <p class="hint text-xs text-slate-500 mt-1">存一組固定關鍵字，一次跑完並依截止日排序。</p>
           </div>
-          <button onclick="runWatch()" class="px-4 py-2 bg-ink-800 hover:bg-ink-900 text-white rounded-lg text-sm font-medium whitespace-nowrap"><i class="fa-solid fa-rotate mr-1"></i>更新監看</button>
+          <button onclick="runWatch()" class="px-4 py-2 bg-jade-600 hover:bg-jade-700 text-white rounded-lg text-sm font-medium whitespace-nowrap"><i class="fa-solid fa-rotate mr-1"></i>更新監看</button>
         </div>
         <div id="watchChips" class="flex flex-wrap gap-2 mt-4"></div>
         <div class="flex gap-2 mt-3">
@@ -298,10 +279,10 @@
     <!-- ===== 機關洞察 ===== -->
     <section data-view="agencies" hidden>
       <div class="card p-5 mb-4">
-        <div class="eyebrow">AGENCY INSIGHT</div>
-        <h3 class="font-bold text-ink-900 mt-1">選一個機關，看它歷年發包給誰</h3>
-        <p class="text-xs text-slate-500 mt-1">選定後會直接向 API 抓該機關的<strong>全期間</strong>公告，不受同步天數限制。</p>
-        <p class="text-xs text-slate-400 mt-1">下方是<strong>已認識的機關</strong>——標案 API 沒有「用機關名稱查機關」的端點，機關只能從抓下來的公告裡累積。同步過的公告、查詢結果、開過的標案都會自動加進來，且不會隨公告快取被裁掉。</p>
+        
+        <h3 class="font-bold text-ink-900">選一個機關，看它歷年發包給誰</h3>
+        <p class="hint text-xs text-slate-500 mt-1">選定後會直接向 API 抓該機關的<strong>全期間</strong>公告，不受同步天數限制。</p>
+        <p class="hint text-xs text-slate-400 mt-1">下方是<strong>已認識的機關</strong>——標案 API 沒有「用機關名稱查機關」的端點，機關只能從抓下來的公告裡累積。同步過的公告、查詢結果、開過的標案都會自動加進來，且不會隨公告快取被裁掉。</p>
         <div class="flex gap-2 mt-3">
           <input id="agencyFilter" type="text" placeholder="篩選已認識的機關，例如：台灣電力" class="flex-1 px-3 py-2 border rounded-xl text-sm">
           <button onclick="renderAgencies()" class="px-4 py-2 bg-jade-600 text-white rounded-xl text-sm font-medium">篩選</button>
@@ -315,8 +296,8 @@
     <!-- ===== 市場與廠商 ===== -->
     <section data-view="market" hidden>
       <div class="card p-5 mb-4">
-        <div class="eyebrow">MARKET</div>
-        <h3 class="font-bold text-ink-900 mt-1">得標廠商查詢</h3>
+        
+        <h3 class="font-bold text-ink-900">得標廠商查詢</h3>
         <div class="flex gap-2 mt-3">
           <input id="companyQuery" type="text" placeholder="廠商名稱或統一編號" class="flex-1 px-3 py-2 border rounded-xl text-sm">
           <button onclick="doCompanySearch()" class="px-4 py-2 bg-jade-600 text-white rounded-xl text-sm font-medium">查詢</button>
@@ -325,8 +306,8 @@
       <div id="rivalPanel" class="mb-4"></div>
       <div id="vendorCompare" class="mb-4"></div>
       <div class="card p-5 mb-4">
-        <div class="eyebrow">FROM CACHE</div>
-        <h3 class="font-bold text-ink-900 mt-1">已同步期間的得標廠商排行</h3>
+        
+        <h3 class="font-bold text-ink-900">已同步期間的得標廠商排行</h3>
         <div id="marketRanking" class="mt-3 space-y-2 text-sm"></div>
       </div>
       <div id="companyResults" class="space-y-3"></div>
@@ -355,7 +336,7 @@
     <!-- ===== 追蹤清單 ===== -->
     <section data-view="tracked" hidden>
       <div class="flex items-center justify-between mb-3">
-        <p class="text-xs text-slate-500">追蹤的案子會把詳情快取下來，截止日與預算才能參與統計與行事曆。</p>
+        <p class="hint text-xs text-slate-500">追蹤的案子會把詳情快取下來，截止日與預算才能參與統計與行事曆。</p>
         <button onclick="refreshTrackedDetails()" class="px-3 py-2 text-xs border rounded-lg bg-white"><i class="fa-solid fa-rotate mr-1"></i>更新詳情</button>
       </div>
       <div id="trackedList" class="space-y-3"></div>
@@ -369,12 +350,12 @@
       </div>
     </section>
 
-    <footer class="text-center text-[11px] text-slate-400 py-6 space-x-2">
+    <footer class="text-center text-[11px] text-slate-400 py-6">
       <span>標案資料來源：行政院公共工程委員會政府電子採購網（經 g0v 標案 API）</span><br>
-      <button onclick="exportBackup()" class="underline hover:text-slate-600">匯出備份</button>
-      <button onclick="document.getElementById('backupInput').click()" class="underline hover:text-slate-600">匯入備份</button>
-      <button onclick="clearCaches()" class="underline hover:text-amber-600">只清快取</button>
-      <button onclick="wipeAll()" class="underline hover:text-rose-500">清除全部資料</button>
+      <button onclick="exportBackup()" class="underline hover:text-slate-600 mx-1">匯出備份</button>
+      <button onclick="document.getElementById('backupInput').click()" class="underline hover:text-slate-600 mx-1">匯入備份</button>
+      <button onclick="clearCaches()" class="underline hover:text-amber-600 mx-1">只清快取</button>
+      <button onclick="wipeAll()" class="underline hover:text-rose-500 mx-1">清除全部資料</button>
       <input type="file" id="backupInput" accept=".json" class="hidden">
       <div id="storageMeter" class="mt-3 max-w-sm mx-auto"></div>
     </footer>

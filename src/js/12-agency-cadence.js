@@ -124,9 +124,9 @@ function ratioBlock(){
   const rows=bidRatios(per);
   const st=ratioStats(rows);
   let h='<div class="card p-5">'+
-    '<div class="eyebrow">BID RATIO</div>'+
-    '<h3 class="font-bold text-ink-900 mt-1">落標率（決標金額 ÷ 預算金額）</h3>'+
-    '<p class="text-xs text-slate-500 mt-1">判斷這個機關的案子要壓到幾折才會中。只能算<strong>同時有決標金額與預算金額</strong>的案子，所以樣本數很重要。</p>';
+    ''+
+    '<h3 class="font-bold text-ink-900">落標率（決標金額 ÷ 預算金額）</h3>'+
+    '<p class="hint text-xs text-slate-500 mt-1">判斷這個機關的案子要壓到幾折才會中。只能算<strong>同時有決標金額與預算金額</strong>的案子，所以樣本數很重要。</p>';
   if(!st){
     return h+'<div class="mt-4 flex items-center gap-2 flex-wrap text-xs bg-amber-50 border border-amber-100 rounded-xl p-3">'+
       '<i class="fa-solid fa-coins text-amber-600"></i>'+
@@ -135,7 +135,7 @@ function ratioBlock(){
   }
   const cov=awards.length? Math.round(st.n/awards.length*100) : 0;
   h+='<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">'+
-    '<div class="rounded-xl bg-ink-900 text-white p-3"><div class="text-xl font-bold">'+pct1(st.median)+'</div><div class="text-[11px] text-white/50 mt-0.5">落標率中位數</div></div>'+
+    '<div class="rounded-xl bg-jade-50 border border-jade-100 p-3"><div class="text-xl font-bold text-jade-700">'+pct1(st.median)+'</div><div class="text-[11px] text-slate-500 mt-0.5">落標率中位數</div></div>'+
     '<div class="rounded-xl bg-slate-50 border p-3"><div class="text-xl font-bold text-ink-900">'+fmtNum(st.n)+'</div><div class="text-[11px] text-slate-500 mt-0.5">樣本數（'+cov+'% 決標案）</div></div>'+
     '<div class="rounded-xl bg-slate-50 border p-3"><div class="text-xl font-bold text-ink-900">'+pct1(st.lowest[0].ratio)+'</div><div class="text-[11px] text-slate-500 mt-0.5">最低一案</div></div>'+
     '<div class="rounded-xl bg-slate-50 border p-3"><div class="text-xl font-bold text-ink-900">'+pct1(st.highest[0].ratio)+'</div><div class="text-[11px] text-slate-500 mt-0.5">最高一案</div></div>'+
@@ -155,7 +155,7 @@ function ratioBlock(){
        '<div class="text-[11px] text-slate-500 mt-0.5">'+fmtYmd(x.date)+' · 預算 '+fmtWan(x.budget)+' → 決標 '+fmtWan(x.award)+
        ' · <strong class="text-rose-600">'+pct1(x.ratio)+'</strong></div></div>').join('')+
      '</div></details>';
-  h+='<p class="text-[11px] text-slate-400 mt-3 leading-relaxed">比值超過 3 倍或非正數的已剔除（多半是複數決標的總額對上單項預算）。'+
+  h+='<p class="hint text-[11px] text-slate-400 mt-3 leading-relaxed">比值超過 3 倍或非正數的已剔除（多半是複數決標的總額對上單項預算）。'+
      '樣本涵蓋率低的時候中位數會偏——它只代表<strong>你已經補齊金額的那些案子</strong>，而不是這個機關的全貌。'+
      '≥100% 的案子通常是決標金額含後續擴充或變更設計。</p>';
   return h+'</div>';

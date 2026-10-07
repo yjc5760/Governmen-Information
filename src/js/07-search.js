@@ -252,7 +252,7 @@ async function runScan(){
 
   const pager=document.getElementById('searchPager');
   let pb='<div class="flex flex-wrap gap-2 justify-center">';
-  if(!st.exhausted && !stopped) pb+='<button onclick="runScan()" class="px-3 py-2 text-xs rounded-lg bg-ink-800 hover:bg-ink-900 text-white font-medium"><i class="fa-solid fa-angles-down mr-1"></i>繼續掃下 '+SEARCH_SCAN_PAGES+' 頁</button>';
+  if(!st.exhausted && !stopped) pb+='<button onclick="runScan()" class="px-3 py-2 text-xs rounded-lg bg-jade-600 hover:bg-jade-700 text-white font-medium"><i class="fa-solid fa-angles-down mr-1"></i>繼續掃下 '+SEARCH_SCAN_PAGES+' 頁</button>';
   if(stopped) pb+='<button onclick="runScan()" class="px-3 py-2 text-xs rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium">重試</button>';
   if(st.agHits && st.agHits.length){
     pb+='<span class="text-[11px] text-slate-400 self-center">機關索引命中 '+st.agHits.length+' 個，改走精準：</span>'+

@@ -32,7 +32,7 @@ function renderStorageMeter(){
     '</div>'+
     '<div class="h-1.5 bg-slate-200 rounded-full overflow-hidden flex">'+
       '<div class="h-full '+tone+'" style="width:'+pctCache+'%"></div>'+
-      '<div class="h-full bg-ink-800" style="width:'+Math.min(100-pctCache,Math.round(u.user/LIMIT*100))+'%"></div>'+
+      '<div class="h-full bg-slate-400" style="width:'+Math.min(100-pctCache,Math.round(u.user/LIMIT*100))+'%"></div>'+
     '</div>'+
     (pctAll>=70?('<p class="text-[10px] text-amber-600 mt-1">快接近瀏覽器上限（通常約 5 MB）。按「只清快取」可以釋出 '+mb(u.cache)+' MB，你的追蹤與比較不會動到。</p>'):'');
 }
