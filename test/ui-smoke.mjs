@@ -138,6 +138,10 @@ assert.ok(cards[1].includes('廠商丙公司') && !cards[1].includes('得標丙�
                  total: recs.length, totalPages: 1, pagesFetched: 1, stop: { reason: 'done' } };
     unitPeriod = 0;
     go('agencies');
+    // openAgency() 會先拿掉 hidden；這裡繞過抓取直接塞資料，所以要自己做。
+    // 以前沒這行也會過，是因為測試環境連不到 Tailwind CDN、.hidden 根本沒樣式——
+    // Tailwind 內嵌之後才現形。
+    document.getElementById('agencyDetail').classList.remove('hidden');
     renderAgencyDetail();
   }, records);
   await page.waitForTimeout(300);
@@ -214,6 +218,10 @@ assert.ok(cards[1].includes('廠商丙公司') && !cards[1].includes('得標丙�
       at: Date.now() } }));
     preDetail = JSON.parse(localStorage.getItem('pi_pre_detail'));
     go('agencies');
+    // openAgency() 會先拿掉 hidden；這裡繞過抓取直接塞資料，所以要自己做。
+    // 以前沒這行也會過，是因為測試環境連不到 Tailwind CDN、.hidden 根本沒樣式——
+    // Tailwind 內嵌之後才現形。
+    document.getElementById('agencyDetail').classList.remove('hidden');
     renderAgencyDetail();
   }, records);
   await page.waitForTimeout(300);

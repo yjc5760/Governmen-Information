@@ -1,0 +1,18 @@
+/* 順序有講究：自訂樣式夾在 components 與 utilities 之間。
+   舊版用 Play CDN 時，Tailwind 是在執行期把樣式插在 <head> 最後面，
+   所以工具 class（px-2、text-xs…）會蓋過 .tag／.card 這些自訂樣式。
+   維持同樣的覆蓋關係，畫面才會跟以前一樣。 */
+@tailwind base;
+@tailwind components;
+
+body { background:#EDF2F1; }
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-thumb { background:#c3d3cf; border-radius:4px; }
+.eyebrow { letter-spacing:.14em; font-size:11px; font-weight:700; color:#0F7168; }
+.card { background:#fff; border-radius:14px; box-shadow:0 1px 2px rgba(16,63,59,.06); }
+.tag { display:inline-block; padding:3px 12px; border-radius:999px; font-size:11px; font-weight:600; }
+.navitem { display:flex; align-items:center; gap:.75rem; padding:.6rem .9rem; border-radius:10px; font-size:.9rem; color:#cfe0dc; cursor:pointer; }
+.navitem:hover { background:rgba(255,255,255,.06); }
+.navitem.active { background:rgba(21,145,131,.18); color:#fff; font-weight:600; box-shadow:inset 3px 0 0 #159183; }
+
+@tailwind utilities;

@@ -993,3 +993,55 @@ test('fetchVendor：真的到最後一頁才算抓完', async () => {
     assert.equal(app.vsnapCoverage({ fetched: 284, total: 284, stop: res.stop }).ratio, 1);
   } finally { app.api = realApi; }
 });
+
+test('esc 連引號都跳脫：屬性內插不能被資料跳出', () => {
+  assert.equal(app.esc('a"b\'c<d>&'), 'a&quot;b&#39;c&lt;d&gt;&amp;');
+  assert.equal(app.esc(null), '');
+  assert.equal(app.esc(0), '0');
+  const evil = 'x" onmouseover="alert(1)';
+  assert.ok(!app.esc(evil).includes('"'), '雙引號沒跳脫就能跳出 title="…"');
+});
+
+test('safeUrl 只放行 http(s)', () => {
+  assert.equal(app.safeUrl('https://web.pcc.gov.tw/a?b=1'), 'https://web.pcc.gov.tw/a?b=1');
+  assert.equal(app.safeUrl(' HTTP://x.tw '), 'HTTP://x.tw');
+  assert.equal(app.safeUrl('javascript:alert(1)'), '');
+  assert.equal(app.safeUrl('  JavaScript:alert(1)'), '');
+  assert.equal(app.safeUrl('data:text/html,x'), '');
+  assert.equal(app.safeUrl(undefined), '');
+});
+
+test('buildFailed 改成分組＋二分搜尋後，結果與舊的逐筆掃描完全相同', () => {
+  // 舊寫法（流標數 × 招標數）照抄當參考答案
+  const ref = recs => {
+    const fails = recs.filter(r => app.isFailedAward(app.recTy(r)));
+    const tenders = recs.map(r => ({ r, d: app.recDate(r) })).filter(o => o.d && app.isTender(app.recTy(o.r)));
+    return fails.map(f => {
+      const fd = app.recDate(f); if (!fd) return null;
+      const title = (f.brief && f.brief.title) || ''; const k = app.seriesKey(title);
+      const re = tenders.filter(o => o.d > fd && app.seriesKey((o.r.brief && o.r.brief.title) || '') === k)
+                        .sort((a, b) => a.d - b.d)[0];
+      return { title, date: f.date, job: f.job_number,
+               reDate: re ? re.r.date : null, reJob: re ? re.r.job_number : null,
+               lag: re ? Math.round((re.d - fd) / 86400000) : null };
+    }).filter(Boolean).sort((a, b) => app.recDate({ date: b.date }) - app.recDate({ date: a.date }));
+  };
+  let seed = 3; const rnd = () => ((seed = seed * 16807 % 2147483647) / 2147483647);
+  const types = ['公開招標公告', '無法決標公告', '決標公告', '更正公告', '限制性招標(經公開評選或公開徵求)公告'];
+  const subj = ['鍋爐維護', '冷卻水塔清洗', '消防設備保養', ''];
+  const recs = Array.from({ length: 3000 }, (_, i) => {
+    const y = 2018 + Math.floor(rnd() * 8), m = 1 + Math.floor(rnd() * 12), d = 1 + Math.floor(rnd() * 3); // 刻意製造同日
+    return { job_number: 'J' + i, date: '' + y + String(m).padStart(2, '0') + String(d).padStart(2, '0'),
+             brief: { type: types[Math.floor(rnd() * types.length)],
+                      title: (y - 1911) + '年度' + subj[Math.floor(rnd() * subj.length)] } };
+  });
+  const strip = rows => JSON.stringify(rows.map(x => [x.title, x.date, x.job, x.reDate, x.reJob, x.lag]));
+  assert.equal(strip(app.buildFailed(recs)), strip(ref(recs)));
+});
+
+test('recDateRange 取頭尾、ymdDash 用本地日期（不可早一天）', () => {
+  const rg = app.recDateRange([{ date: '20240105' }, { date: 'bad' }, { date: '20190301' }, { date: '20260930' }]);
+  assert.equal(app.ymdDash(rg.from), '2019-03-01');
+  assert.equal(app.ymdDash(rg.to), '2026-09-30');
+  assert.equal(app.recDateRange([{ date: '' }]), null);
+});

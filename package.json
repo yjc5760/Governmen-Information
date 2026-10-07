@@ -7,6 +7,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "build": "node build/build-html.mjs",
     "test": "node --test \"test/**/*.test.mjs\"",
     "build:exe": "node build/build-exe.mjs",
     "build:pages": "node build/build-pages.mjs"
@@ -15,5 +16,11 @@
     "cheerio": "^1.0.0",
     "iconv-lite": "^0.6.3"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "postcss": "^8.5.29",
+    "tailwindcss": "^3.4.19"
+  }
 }

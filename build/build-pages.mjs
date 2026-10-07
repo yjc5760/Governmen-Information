@@ -14,11 +14,17 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assembleJs, extractJs } from './build-html.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out  = join(root, 'site');
 
 let html = readFileSync(join(root, '標案參謀室.html'), 'utf8');
+// 標案參謀室.html 是由 src/ 建置出來的；src 改了卻沒重建，就會把舊版發布出去
+if (extractJs(html) !== assembleJs()) {
+  console.error('\n  標案參謀室.html 跟 src/ 不一致：src/ 改過但還沒重新建置。請先執行  npm run build\n');
+  process.exit(1);
+}
 const VIEWPORT = /<meta name="viewport"[^>]*>/;
 if (!VIEWPORT.test(html)) throw new Error('找不到 viewport meta，插不進 noindex —— HTML 開頭被改過了？');
 if (!/name="robots"/.test(html)) {

@@ -44,14 +44,23 @@ proxy 預設只綁 `127.0.0.1`，同一台機器以外連不進來。想從手�
 
 ```
 自用情報網站/
-├── 標案參謀室.html      前端網頁（單檔，約 1300 行）
+├── 標案參謀室.html      前端網頁（單檔）——由 src/ 建置產生，不要直接改
+├── src/                 前端原始碼（改網頁改這裡，再 npm run build）
+│   ├── index.html          版面；<!-- @@CSS --> / <!-- @@JS --> 是插入點
+│   ├── styles.css          自訂樣式 + Tailwind 指令
+│   ├── tailwind.config.cjs 自訂色（ink / jade / paper）
+│   └── js/NN-*.js          程式，依檔名順序串成同一段 <script>（共用全域，不是 ES module）
 ├── server.js            本機 proxy + 靜態檔伺服器
 ├── test/
 │   ├── parse.test.mjs      server.js 的煙霧測試（不連外網）
+│   ├── build.test.mjs      確認 標案參謀室.html 沒落後 src/（改了 src 忘記 build 會紅）
 │   ├── frontend.test.mjs   前端純邏輯測試（用 node:vm 跑 HTML 裡的 script，零額外依賴）
 │   └── ui-smoke.mjs        畫面實測（真的用滑鼠點，需自行裝 playwright，npm test 不會跑）
 ├── docs/                   專案文件（改程式前先看易錯陷阱清單）
 ├── build/
+│   ├── build-html.mjs      src/ → 標案參謀室.html（Tailwind 在這裡編好內嵌）
+│   ├── build-pages.mjs     產出 GitHub Pages 用的 site/
+│   ├── 發布網頁.bat        建置 site/ 並推到公開的 Pages repo
 │   ├── build-exe.mjs       打包成單一執行檔（Node SEA）
 │   ├── exe-entry.mjs       打包後的入口（自動開瀏覽器、連接埠備援）
 │   └── 打包exe.bat         Windows 一鍵打包
@@ -64,12 +73,21 @@ proxy 預設只綁 `127.0.0.1`，同一台機器以外連不進來。想從手�
 ```
 
 改版靠 git，不要再複製 `xxx.backup-日期.html` 放在資料夾裡（`.gitignore` 已經排除這種檔名）。
-改壞了用 `git diff` / `git checkout -- 標案參謀室.html` 還原。
+改壞了用 `git diff` / `git checkout -- src/` 還原。
 
 ```bash
+npm install              # 第一次（裝 tailwindcss 等建置工具）
+npm run build            # 改了 src/ 之後：重新產生 標案參謀室.html
+npm test                 # 改完先跑這個（含「輸出檔是否落後 src」的檢查）
 git log --oneline        # 看版本歷史
-npm test                 # 改完 server.js 先跑這個
 ```
+
+**改網頁要改 `src/`，不要直接改 `標案參謀室.html`。** 輸出檔第二行記著內容雜湊，
+直接改過的話 `npm run build` 會停下來不覆蓋（確定不要那些修改才加 `--force`）。
+
+**Tailwind 的 class 一定要寫完整**，不能用字串拼：`'bg-'+tone+'-100'` 建置時掃不到，
+畫面會沒顏色。要寫成 `tone==='rose' ? 'bg-rose-100' : 'bg-slate-100'`。
+`npm run build` 會點名可疑的拼接寫法。
 
 ---
 
@@ -570,8 +588,8 @@ budget  link
   改完跑 `npm test` 會抓到明顯的解析失敗
 - 預算欄位官網有時不公開，會顯示「未提供」（API 回 `budget: 0`）
 - `remainingDays` 用 `Math.ceil` 算到截止日 23:59，所以「今天截止」會顯示剩 1 天。前端算法一致，兩邊沒有落差
-- 網頁用 CDN 載 Tailwind 與 Font Awesome，**完全離線時樣式會掉**（功能仍在）
-- 前端是單一 HTML 檔，大量 `innerHTML` 字串拼接。要大改的話值得先拆檔
+- Tailwind 已在建置時內嵌；Font Awesome 仍走 CDN，**完全離線時圖示會不見**（功能與版面仍在）
+- 前端已拆到 `src/`，但仍大量用 `innerHTML` 字串拼接，所有外來資料一定要過 `esc()`（連結過 `safeUrl()`）
 - 發包節奏的系列比對靠名稱正規化，改名重招會認不出來（見上節）
 - `test/frontend.test.mjs` 用 `node:vm` 跑 HTML 裡抽出來的 `<script>`，配一組最小 DOM 假物件。
   只測純邏輯，不測畫面；若主程式頂層新增了測試環境沒有的 DOM 呼叫，這支測試會先壞掉——
