@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 由 src/ 自動產生（npm run build）。請改 src/ 底下的檔案，不要直接改這份。 build-hash:6ec1924c85a6577e -->
+<!-- 由 src/ 自動產生（npm run build）。請改 src/ 底下的檔案，不要直接改這份。 build-hash:f7fad4c16506b5e2 -->
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -2070,16 +2070,94 @@ function pickMoneyAcross(records, keys){
 }
 
 /* ================= API ================= */
-async function api(path){
+/* ---------- API 限流（2026-10-07 實測） ----------
+   openfun 對沒帶 token 的訪客有限流，行為是典型的 token bucket：
+     · 閒置後可以連打約 10 次（剛好碰到補額度時看起來像 14 次）
+     · 之後每 3 秒才補 1 次額度，也就是穩定速度約每分鐘 20 次
+     · 超過回 HTTP 429「Too Many Requests. 訪客請求太頻繁」，沒有 Retry-After
+   ⚠ 429 回應沒有 CORS 標頭（200 才有 Access-Control-Allow-Origin: *）。所以從
+     localhost:5178 或 GitHub Pages 呼叫時，瀏覽器根本看不到 429，只會丟
+     TypeError: Failed to fetch。以前記成「listbyunit 連抓約 15 頁就被斷線」、
+     廠商「第 24 頁失敗」，其實都是這個限流。
+   對策（集中在這裡，每個呼叫 API 的地方都受惠）：
+     1. 所有請求排隊、共用一個客戶端額度，速度壓在限流之下（容量 8、每 3.2 秒補 1）
+     2. 真的撞到（429 或 Failed to fetch）就把額度歸零、等一段時間再試，
+        而且透過 onWait 把「為什麼在等、等多久」講出來，不要讓畫面像當掉
+   有自己申請的 token（設定 → API Token）時不預先放慢，只保留撞到時的退避。 */
+const API_BUCKET_CAP = 8;
+const API_REFILL_MS  = 3200;
+const API_LIMIT_WAIT = [6000, 12000, 20000, 30000];   // 撞到限流後的等待（大量抓取用）
+const API_LIMIT_WAIT_QUICK = [6000];                  // 單次查詢：等一次就好，連不上要早點告訴人
+let apiTokens = API_BUCKET_CAP, apiRefillAt = Date.now(), apiQueue = Promise.resolve();
+function apiSleep(ms){ return new Promise(s=>setTimeout(s,ms)); }   // 函式宣告：測試可以換掉
+
+function apiRefill(){
+  const now=Date.now();
+  apiTokens=Math.min(API_BUCKET_CAP, apiTokens+(now-apiRefillAt)/API_REFILL_MS);
+  apiRefillAt=now;
+}
+/* 取得一次請求額度。請求一律排隊，避免多個迴圈同時搶額度。 */
+async function apiSlot(onWait){
+  const prev=apiQueue; let release; apiQueue=new Promise(r=>release=r);
+  await prev;
+  try{
+    if(apiToken()) return;                       // 有 token：不預先放慢
+    apiRefill();
+    if(apiTokens<1){
+      const ms=Math.ceil((1-apiTokens)*API_REFILL_MS);
+      if(onWait) onWait(ms,'pace');
+      await apiSleep(ms); apiRefill();
+    }
+    apiTokens-=1;
+  }finally{ release(); }
+}
+/* 被限流了：本地額度歸零，接下來照補充速度走 */
+function apiDrain(){ apiTokens=0; apiRefillAt=Date.now(); }
+
+/* opt.onWait(ms, why)：why = 'pace'（主動放慢）或 'limit'（被限流，退避中）
+   opt.patient：大量抓取（翻頁、逐案補資料）用，撞到限流會多等幾輪 */
+async function api(path, opt){
+  opt=opt||{};
+  const waits=opt.patient?API_LIMIT_WAIT:API_LIMIT_WAIT_QUICK;
   const url=apiBase()+path;
-  const tk=apiToken();
-  let r=await fetch(url, tk?{headers:{'Authorization':'Bearer '+tk}}:{});
-  if(!r.ok && tk && (r.status===401||r.status===403)){
-    r=await fetch(url);                 // token 失效就退回不帶 token 的公開查詢
-    if(r.ok) LS.del(K.TOKEN);
+  for(let i=0;;i++){
+    await apiSlot(opt.onWait);
+    const tk=apiToken();
+    let r=null, netErr=null;
+    try{
+      r=await fetch(url, tk?{headers:{'Authorization':'Bearer '+tk}}:{});
+      if(!r.ok && tk && (r.status===401||r.status===403)){
+        r=await fetch(url);              // token 失效就退回不帶 token 的公開查詢
+        if(r.ok) LS.del(K.TOKEN);
+      }
+    }catch(e){ netErr=e; }
+    const limited = (r && r.status===429) || (netErr && !(typeof navigator!=='undefined' && navigator.onLine===false));
+    if(!limited){
+      if(netErr) throw new Error('連不上 API（'+netErr.message+'），請確認網路');
+      if(!r.ok) throw new Error('API 回應 '+r.status+(r.status===403?'（可能被 Cloudflare 擋或 token 失效）':''));
+      return r.json();
+    }
+    apiDrain();
+    if(i>=waits.length){
+      throw new Error('API 限流中（訪客請求太頻繁），等了 '+Math.round(waits.reduce((a,b)=>a+b,0)/1000)+
+        ' 秒仍未恢復。稍等一兩分鐘再試；常用的話可到 data.openfun.tw 申請帳號，把 token 填進「設定 → API Token」');
+    }
+    if(opt.onWait) opt.onWait(waits[i],'limit');
+    else apiLimitNotice(waits[i]);
+    await apiSleep(waits[i]);
   }
-  if(!r.ok) throw new Error('API 回應 '+r.status+(r.status===403?'（可能被 Cloudflare 擋或 token 失效）':''));
-  return r.json();
+}
+/* 呼叫端沒有自己的進度訊息時（逐案補金額、更新追蹤等），用提示告訴人在等什麼；20 秒內不重複 */
+let apiNoticeAt=0;
+function apiLimitNotice(ms){
+  const st=document.getElementById('apiStatus'); if(st) st.textContent=apiWaitText(ms,'limit');
+  if(Date.now()-apiNoticeAt<20000) return;
+  apiNoticeAt=Date.now(); toast(apiWaitText(ms,'limit')+'。資料不會漏，只是比較慢。','warning');
+}
+/* 給進度訊息用：把等待講成一句話 */
+function apiWaitText(ms,why){
+  return why==='limit' ? ('API 限流（請求太頻繁），等 '+Math.round(ms/1000)+' 秒後繼續')
+                       : ('放慢速度避免被限流，'+Math.max(1,Math.round(ms/1000))+' 秒');
 }
 async function testApi(){
   const oldBase=LS.get(K.BASE,null), oldTok=LS.get(K.TOKEN,null);
@@ -2579,7 +2657,7 @@ async function runScan(){
   for(let p=from;p<=to;p++){
     meta.innerHTML='<i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i>掃描第 '+p+' 頁…已找到 '+fmtNum(st.hits.length)+' 筆符合';
     let r;
-    try{ r=await api('/api/'+driverEndpoint(st.driver)+'?query='+encodeURIComponent(c[st.driver])+'&page='+p); }
+    try{ r=await api('/api/'+driverEndpoint(st.driver)+'?query='+encodeURIComponent(c[st.driver])+'&page='+p,{patient:true}); }
     catch(e){ stopped={message:e.message,page:p}; break; }
     if(r.total_records!=null) st.total=r.total_records;
     st.tp=r.total_pages||st.tp;
@@ -3046,12 +3124,13 @@ function fmtWan(n){ if(!n) return '—';
   return n.toLocaleString()+' 元'; }
 
 /* 大機關的公告量很可觀（台電總公司 3.13.31 有 4 萬則、41 頁、每頁 1000 筆約 630KB）。
-   實測連續抓 15 頁之後第 16 頁就會 Failed to fetch——API 對連續大量請求會斷線。
-   所以：每輪只抓固定頁數、頁間拉長間隔、單頁失敗會退避重試，
-   而且不管是被擋還是撞到上限，都保留已經抓到的資料並在畫面上說清楚沒抓完。 */
-const AGENCY_PAGE_CAP = 15;                 // 每輪最多頁數
-const AGENCY_PAGE_GAP = 700;                // 頁間間隔（毫秒）
-const AGENCY_RETRY    = [1500,4000,9000];   // 單頁失敗的退避重試
+   以前實測「連續抓 15 頁之後第 16 頁就 Failed to fetch」，當成 API 會斷線；
+   2026-10-07 查清楚其實是訪客限流（429，見 03-api.js），api() 現在會自動放慢與等待。
+   每輪頁數上限仍保留（一輪 30 頁約 1.5 分鐘），撞到上限或真的失敗都保留已抓到的資料、
+   在畫面上說清楚沒抓完，可以按「繼續往下抓」。 */
+const AGENCY_PAGE_CAP = 30;                 // 每輪最多頁數
+const AGENCY_PAGE_GAP = 0;                  // 節流改由 api() 統一處理（見 03-api.js）
+const AGENCY_RETRY    = [1500,4000];        // 非限流的偶發失敗才在這裡重試；限流由 api() 等待
 
 /* 分頁去重：抓第 N 頁與第 N+1 頁之間官網若新增公告，位移會讓邊界紀錄被重抓
    （實測台電總公司 30,000 筆裡有 34 筆一字不差的重複，多數貼齊每千筆邊界）。
@@ -3063,11 +3142,11 @@ function unitRecKey(r){
           ((r.brief&&r.brief.companies&&r.brief.companies.names)||[]).join('')].join(' ');
 }
 
-async function fetchUnitPage(unit_id,page,onRetry){
+async function fetchUnitPage(unit_id,page,onRetry,onWait){
   let last;
   for(let i=0;i<=AGENCY_RETRY.length;i++){
     if(i){ if(onRetry) onRetry(i,AGENCY_RETRY[i-1]); await new Promise(s=>setTimeout(s,AGENCY_RETRY[i-1])); }
-    try{ return await api('/api/listbyunit?unit_id='+encodeURIComponent(unit_id)+'&page='+page); }
+    try{ return await api('/api/listbyunit?unit_id='+encodeURIComponent(unit_id)+'&page='+page,{patient:true,onWait}); }
     catch(e){ last=e; }
   }
   throw last;
@@ -3082,7 +3161,8 @@ async function loadUnitPages(unit_id,startPage,existing,unit_name,say){
     let r;
     try{
       r=await fetchUnitPage(unit_id,page,(i,wait)=>
-        say('第 '+page+' 頁失敗，'+(wait/1000)+' 秒後重試（第 '+i+' 次）…已取得 '+fmtNum(all.length)+' 則'));
+        say('第 '+page+' 頁失敗，'+(wait/1000)+' 秒後重試（第 '+i+' 次）…已取得 '+fmtNum(all.length)+' 則'),
+        (ms,why)=>{ if(why==='limit'||ms>=1500) say('抓取 '+esc(name||unit_id)+'：第 '+page+(tp?(' / '+tp):'')+' 頁，'+apiWaitText(ms,why)+'…已取得 '+fmtNum(all.length)+' 則'); });
     }catch(e){ stop={reason:'error',message:e.message,page}; break; }
     name=r.unit_name||name;
     tp=r.total_page||r.total_pages||tp||1;
@@ -3730,7 +3810,7 @@ async function fillPreDetail(){
       '<button onclick="fillAbort=true" class="px-3 py-1 rounded-lg border bg-white text-xs">取消</button></div>'+
       '<div class="h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden"><div class="h-full bg-sky-500 rounded-full" style="width:'+(done/need.length*100)+'%"></div></div>';
     try{
-      const r=await api('/api/tender?unit_id='+encodeURIComponent(unitData.unit_id)+'&job_number='+encodeURIComponent(x.job));
+      const r=await api('/api/tender?unit_id='+encodeURIComponent(unitData.unit_id)+'&job_number='+encodeURIComponent(x.job),{patient:true});
       const recs=r.records||[];
       // 取最新的那則前置公告（更正公告會補正內容，所以更正也要看）
       const pres=recs.filter(q=>{ const y=String((q.brief&&q.brief.type)||''); return y.indexOf('公開閱覽')>=0||y.indexOf('徵求廠商提供參考資料')>=0; })
@@ -3921,7 +4001,7 @@ async function fillFlopDetail(){
       '<button onclick="fillAbort=true" class="px-3 py-1 rounded-lg border bg-white text-xs">取消</button></div>'+
       '<div class="h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden"><div class="h-full bg-amber-500 rounded-full" style="width:'+(done/need.length*100)+'%"></div></div>';
     try{
-      const r=await api('/api/tender?unit_id='+encodeURIComponent(unitData.unit_id)+'&job_number='+encodeURIComponent(x.job));
+      const r=await api('/api/tender?unit_id='+encodeURIComponent(unitData.unit_id)+'&job_number='+encodeURIComponent(x.job),{patient:true});
       const recs=r.records||[];
       const reasons=[], budgets=[]; let reuse='';
       recs.forEach(function(q){
@@ -4314,7 +4394,7 @@ function persistAmountCache(){
 }
 
 async function fetchAmount(job_number){
-  const r=await api('/api/tender?unit_id='+encodeURIComponent(unitData.unit_id)+'&job_number='+encodeURIComponent(job_number));
+  const r=await api('/api/tender?unit_id='+encodeURIComponent(unitData.unit_id)+'&job_number='+encodeURIComponent(job_number),{patient:true});
   const recs=r.records||[];
   const aw=recs.filter(x=>isAward((x.brief&&x.brief.type)||''));
   const rec=aw.length?aw[aw.length-1]:recs[recs.length-1];
@@ -4431,7 +4511,7 @@ function renderMarketRanking(){
    要靠 name_key 分（見 splitCompanies）。分完才有辦法區分
    「一起得標的夥伴」和「同場競標的對手」——這兩件事以前被混成一項。 */
 const RIVAL_PER_PAGE = 100;   // 實測值，不是 20
-const RIVAL_PAGE_GAP = 400;
+const RIVAL_PAGE_GAP = 0;     // 節流改由 api() 統一處理（見 03-api.js 的限流說明）
 const VSNAP_MAX = 20;
 const RIVAL_SUGGEST = ['中興工程顧問','台灣世曦工程顧問','亞新工程顧問','中鼎工程','泰興工程顧問','聯邦工程顧問'];
 
@@ -4451,7 +4531,7 @@ function sameVendor(a,b){
    （那是從我誤以為每頁 20 筆、以及 listbyunit 會斷線的經驗延伸來的，
    但 searchbycompanyname 每頁只約 127KB，不是 listbyunit 的 630KB）。 */
 const RIVAL_PAGE_CAP = 60;                 // 抓到底的硬上限，約 6,000 筆
-const RIVAL_RETRY = [1200,3000,7000];      // 單頁失敗或回空值的退避重試
+const RIVAL_RETRY = [1500,4000];           // 非限流的偶發失敗／空頁才在這裡重試；限流由 api() 等待
 const VPAGE_CHOICES = [[3,'3 頁'],[6,'6 頁'],[12,'12 頁'],[0,'抓到底']];
 
 function rivalLimit(){
@@ -4464,13 +4544,14 @@ function setVendorPages(v){
   renderRivals();
 }
 /* 抓 n 頁大約要幾秒：每頁一次請求約 0.6 秒，加上頁間間隔 */
-function rivalEta(pages){ return Math.max(1, Math.round(pages*(0.6+RIVAL_PAGE_GAP/1000))); }
+/* 抓 n 頁大約要幾秒：每次請求約 0.6 秒；超過 API 額度的部分每頁要等補額度（約 3.2 秒） */
+function rivalEta(pages){ return Math.max(1, Math.round(pages*0.6 + Math.max(0,pages-API_BUCKET_CAP)*API_REFILL_MS/1000)); }
 
-async function fetchVendorPage(name,page,onRetry){
+async function fetchVendorPage(name,page,onRetry,onWait){
   let last;
   for(let i=0;i<=RIVAL_RETRY.length;i++){
     if(i){ if(onRetry) onRetry(i,RIVAL_RETRY[i-1]); await new Promise(s=>setTimeout(s,RIVAL_RETRY[i-1])); }
-    try{ return await api('/api/searchbycompanyname?query='+encodeURIComponent(name)+'&page='+page); }
+    try{ return await api('/api/searchbycompanyname?query='+encodeURIComponent(name)+'&page='+page,{patient:true,onWait}); }
     catch(e){ last=e; }
   }
   throw last;
@@ -4484,7 +4565,8 @@ async function fetchVendor(name,pages,say){
     if(say) say('抓取 '+name+'：第 '+p+(tp?(' / '+tp):'')+' 頁…已取得 '+fmtNum(recs.length)+' 筆');
     let r;
     try{
-      r=await fetchVendorPage(name,p,(i,ms)=>{ if(say) say('抓取 '+name+'：第 '+p+' 頁失敗，'+(ms/1000)+' 秒後重試（第 '+i+' 次）'); });
+      r=await fetchVendorPage(name,p,(i,ms)=>{ if(say) say('抓取 '+name+'：第 '+p+' 頁失敗，'+(ms/1000)+' 秒後重試（第 '+i+' 次）'); },
+        (ms,why)=>{ if(say && (why==='limit'||ms>=1500)) say('抓取 '+name+'：第 '+p+(tp?(' / '+tp):'')+' 頁，'+apiWaitText(ms,why)+'…已取得 '+fmtNum(recs.length)+' 筆'); });
     }catch(e){
       stop={reason:'fail', page:p, msg:e.message};   // 保留前面抓到的，不整批丟掉
       break;
@@ -4500,7 +4582,8 @@ async function fetchVendor(name,pages,say){
        所以只要 total_pages 說後面還有，就先重試，確認過才認定是結束。 */
     if(!rows.length && tp && p<tp){
       try{
-        const r2=await fetchVendorPage(name,p,(i,ms)=>{ if(say) say('抓取 '+name+'：第 '+p+' 頁回空值，'+(ms/1000)+' 秒後重試'); });
+        const r2=await fetchVendorPage(name,p,(i,ms)=>{ if(say) say('抓取 '+name+'：第 '+p+' 頁回空值，'+(ms/1000)+' 秒後重試'); },
+          (ms,why)=>{ if(say && why==='limit') say('抓取 '+name+'：第 '+p+' 頁，'+apiWaitText(ms,why)); });
         rows=r2.records||[];
       }catch(e){}
       if(!rows.length){ stop={reason:'empty', page:p}; break; }
@@ -4936,7 +5019,7 @@ async function refreshTrackedDetails(){
   for(const t of tracked){
     if(t.src==='live') continue;
     try{
-      const r=await api('/api/tender?unit_id='+encodeURIComponent(t.unit_id)+'&job_number='+encodeURIComponent(t.job_number));
+      const r=await api('/api/tender?unit_id='+encodeURIComponent(t.unit_id)+'&job_number='+encodeURIComponent(t.job_number),{patient:true});
       const recs=r.records||[]; if(!recs.length) continue;
       const d=recs[recs.length-1].detail||{};
       t.deadline=pick(d,['截止投標','投標截止'])||t.deadline;
